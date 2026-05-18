@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pYYZY8AGZPdChPLsIIMsKIbe35dYKUO7tzkZGL62RSZCMOW0jZWgku1KnDuSmc5
+\restrict tqbzh9vNChrVtfvIp2F0Wqlg0iGyci1lW7CNwMHkED5IxRykhu0L4x75cbAKft8
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9
@@ -42,18 +42,18 @@ CREATE FUNCTION public.__create_conversation(p_type text, p_title text DEFAULT N
     SET search_path TO 'public'
     AS $$DECLARE
   v_conversation_id bigint;
-  v_user_id uuid;
+v_user_id uuid;
 BEGIN
-  v_user_id := auth.uid(); 
+  v_user_id := auth.uid();
 
-  INSERT INTO public.conversations (type, created_by, title)
-  VALUES (p_type, v_user_id, p_title)
-  RETURNING id INTO v_conversation_id;
-  
-  INSERT INTO public.conversation_members (conversation_id, profile_id, role)
-  VALUES (v_conversation_id, v_user_id, 'admin');
-  
-  RETURN v_conversation_id;
+INSERT INTO public.conversations (type, created_by, title)
+VALUES (p_type, v_user_id, p_title)
+    RETURNING id INTO v_conversation_id;
+
+INSERT INTO public.conversation_members (conversation_id, profile_id, role)
+VALUES (v_conversation_id, v_user_id, 'admin');
+
+RETURN v_conversation_id;
 END;$$;
 
 
@@ -101,13 +101,13 @@ CREATE FUNCTION public._increment_video_metric(p_video_id bigint, p_column text,
 begin
   if p_column not in ('view_count') then
     raise exception 'unsupported video metric %', p_column;
-  end if;
+end if;
 
-  execute format(
-    'update public.videos set %I = greatest(coalesce(%I, 0) + $1, 0) where id = $2',
-    p_column,
-    p_column
-  ) using p_delta, p_video_id;
+execute format(
+        'update public.videos set %I = greatest(coalesce(%I, 0) + $1, 0) where id = $2',
+        p_column,
+        p_column
+        ) using p_delta, p_video_id;
 end;
 $_$;
 
@@ -121,7 +121,7 @@ CREATE FUNCTION public.appeal_ban(p_appeal_message text, p_user_id uuid) RETURNS
     AS $$BEGIN
   INSERT INTO ban_appeals (user_id, appeal_message) VALUES (p_user_id, p_appeal_message);
 
-  UPDATE profiles set is_banned = false where id = p_user_id;
+UPDATE profiles set is_banned = false where id = p_user_id;
 END$$;
 
 
@@ -134,19 +134,19 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.task_versions (
-    id bigint NOT NULL,
-    task_id bigint NOT NULL,
-    version_no integer NOT NULL,
-    status text DEFAULT 'draft'::text NOT NULL,
-    title text DEFAULT 'No Title Provided'::text NOT NULL,
-    ui jsonb DEFAULT '{}'::jsonb NOT NULL,
-    logic jsonb DEFAULT '{"pass": {"min_score": 0}, "rules": []}'::jsonb NOT NULL,
-    created_by uuid DEFAULT auth.uid() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    published_at timestamp with time zone,
-    CONSTRAINT task_versions_logic_check CHECK ((jsonb_typeof(logic) = 'object'::text)),
-    CONSTRAINT task_versions_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text]))),
-    CONSTRAINT task_versions_ui_check CHECK ((jsonb_typeof(ui) = 'object'::text))
+                                      id bigint NOT NULL,
+                                      task_id bigint NOT NULL,
+                                      version_no integer NOT NULL,
+                                      status text DEFAULT 'draft'::text NOT NULL,
+                                      title text DEFAULT 'No Title Provided'::text NOT NULL,
+                                      ui jsonb DEFAULT '{}'::jsonb NOT NULL,
+                                      logic jsonb DEFAULT '{"pass": {"min_score": 0}, "rules": []}'::jsonb NOT NULL,
+                                      created_by uuid DEFAULT auth.uid() NOT NULL,
+                                      created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                      published_at timestamp with time zone,
+                                      CONSTRAINT task_versions_logic_check CHECK ((jsonb_typeof(logic) = 'object'::text)),
+                                      CONSTRAINT task_versions_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text]))),
+                                      CONSTRAINT task_versions_ui_check CHECK ((jsonb_typeof(ui) = 'object'::text))
 );
 
 
@@ -159,49 +159,49 @@ CREATE FUNCTION public.clone_task_version(p_task_id bigint, p_source_version_id 
     SET search_path TO 'public'
     AS $$
 declare
-  v_uid uuid := auth.uid();
+v_uid uuid := auth.uid();
   v_source public.task_versions;
   v_next integer;
   v_row public.task_versions;
 begin
   if v_uid is null then
     raise exception 'Not authenticated';
-  end if;
+end if;
 
   if not exists (
     select 1 from public.tasks t where t.id = p_task_id and t.created_by = v_uid
   ) then
     raise exception 'Only owner can clone versions';
-  end if;
+end if;
 
-  select *
-    into v_source
-  from public.task_versions
-  where id = p_source_version_id
-    and task_id = p_task_id;
+select *
+into v_source
+from public.task_versions
+where id = p_source_version_id
+  and task_id = p_task_id;
 
-  if not found then
+if not found then
     raise exception 'Source version not found';
-  end if;
+end if;
 
-  select coalesce(max(version_no), 0) + 1
-  into v_next
-  from public.task_versions
-  where task_id = p_task_id;
+select coalesce(max(version_no), 0) + 1
+into v_next
+from public.task_versions
+where task_id = p_task_id;
 
-  insert into public.task_versions(task_id, version_no, status, title, ui, logic, created_by)
-  values (
-    p_task_id,
-    v_next,
-    'draft',
-    coalesce(p_new_title, v_source.title || ' (copy)'),
-    v_source.ui,
-    v_source.logic,
-    v_uid
-  )
-  returning * into v_row;
+insert into public.task_versions(task_id, version_no, status, title, ui, logic, created_by)
+values (
+           p_task_id,
+           v_next,
+           'draft',
+           coalesce(p_new_title, v_source.title || ' (copy)'),
+           v_source.ui,
+           v_source.logic,
+           v_uid
+       )
+    returning * into v_row;
 
-  return v_row;
+return v_row;
 end;
 $$;
 
@@ -215,15 +215,15 @@ CREATE FUNCTION public.contains_banned_word(p_content text) RETURNS boolean
     AS $_$declare
   v_word text;
 begin
-  for v_word in
-    select word from public.banned_words
-  loop
+for v_word in
+select word from public.banned_words
+                     loop
     if lower(p_content) ~ ('(^|[^a-zA-Z0-9])' || regexp_replace(lower(v_word), '([.^$*+?(){}\[\]\\|])', '\\\1', 'g') || '([^a-zA-Z0-9]|$)') then
       return true;
-    end if;
-  end loop;
+end if;
+end loop;
 
-  return false;
+return false;
 end;$_$;
 
 
@@ -273,23 +273,81 @@ CREATE FUNCTION public.create_conversation(p_type text, p_receiver_id uuid, p_ti
     SET search_path TO 'public'
     AS $$DECLARE
   v_conversation_id bigint;
-  v_user_id uuid;
+v_user_id uuid;
+  v_receiver_is_bot bool := false;
+  v_receiver_has_ai_bot_entry bool := false;
+  v_chat_type text;
+
 BEGIN
-  v_user_id := auth.uid(); 
+  v_user_id := auth.uid();
 
-  INSERT INTO public.conversations (type, created_by, title)
-  VALUES (p_type, v_user_id, p_title)
-  RETURNING id INTO v_conversation_id;
-  
-  INSERT INTO public.conversation_members (conversation_id, profile_id, role)
-  VALUES (v_conversation_id, v_user_id, 'admin');
+SELECT EXISTS (
+    SELECT 1
+    FROM profiles
+    WHERE id = p_receiver_id
+      AND is_bot = true
+)
+INTO v_receiver_is_bot;
 
-  IF p_receiver_id IS NOT NULL THEN
-    INSERT INTO public.conversation_members (conversation_id, profile_id, role)
-    VALUES (v_conversation_id, p_receiver_id, 'member');
-  END IF;
-  
-  RETURN v_conversation_id;
+IF v_receiver_is_bot THEN
+
+SELECT EXISTS (
+    SELECT 1
+    FROM ai_bots
+    WHERE user_id = p_receiver_id
+)
+INTO v_receiver_has_ai_bot_entry;
+
+IF NOT v_receiver_has_ai_bot_entry THEN
+      INSERT INTO ai_bots (user_id)
+      VALUES (
+        p_receiver_id
+      ) ON CONFLICT (user_id) DO NOTHING;
+END IF;
+
+    v_chat_type := coalesce(p_type, 'direct-ai');
+
+ELSE
+    v_chat_type := coalesce(p_type, 'direct');
+END IF;
+
+INSERT INTO conversations (
+    type,
+    created_by,
+    title
+)
+VALUES (
+           v_chat_type,
+           v_user_id,
+           p_title
+       )
+    RETURNING id INTO v_conversation_id;
+
+INSERT INTO conversation_members (
+    conversation_id,
+    profile_id,
+    role
+)
+VALUES (
+           v_conversation_id,
+           v_user_id,
+           'admin'
+       );
+
+IF p_receiver_id IS NOT NULL THEN
+    INSERT INTO conversation_members (
+      conversation_id,
+      profile_id,
+      role
+    )
+    VALUES (
+      v_conversation_id,
+      p_receiver_id,
+      'member'
+    );
+END IF;
+
+RETURN v_conversation_id;
 END;$$;
 
 
@@ -302,38 +360,38 @@ CREATE FUNCTION public.create_task_draft_version(p_task_id bigint, p_title text,
     SET search_path TO 'public'
     AS $$
 declare
-  v_uid uuid := auth.uid();
+v_uid uuid := auth.uid();
   v_next integer;
   v_row public.task_versions;
 begin
   if v_uid is null then
     raise exception 'Not authenticated';
-  end if;
+end if;
 
   if not exists (
     select 1 from public.tasks t where t.id = p_task_id and t.created_by = v_uid
   ) then
     raise exception 'Only owner can create draft versions';
-  end if;
+end if;
 
   if not public.quiz_logic_is_valid(p_logic) then
     raise exception 'Invalid logic JSON';
-  end if;
+end if;
 
   if jsonb_typeof(p_ui) <> 'object' then
     raise exception 'UI JSON must be an object';
-  end if;
+end if;
 
-  select coalesce(max(version_no), 0) + 1
-  into v_next
-  from public.task_versions
-  where task_id = p_task_id;
+select coalesce(max(version_no), 0) + 1
+into v_next
+from public.task_versions
+where task_id = p_task_id;
 
-  insert into public.task_versions(task_id, version_no, status, title, ui, logic, created_by)
-  values (p_task_id, v_next, 'draft', coalesce(p_title, 'No Title Provided'), p_ui, p_logic, v_uid)
-  returning * into v_row;
+insert into public.task_versions(task_id, version_no, status, title, ui, logic, created_by)
+values (p_task_id, v_next, 'draft', coalesce(p_title, 'No Title Provided'), p_ui, p_logic, v_uid)
+    returning * into v_row;
 
-  return v_row;
+return v_row;
 end;
 $$;
 
@@ -347,34 +405,34 @@ CREATE FUNCTION public.delete_message(p_message_id bigint) RETURNS void
     SET search_path TO 'public'
     AS $$
 declare
-  v_message public.messages;
+v_message public.messages;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated' using errcode = '42501';
-  end if;
+end if;
 
-  select *
-  into v_message
-  from public.messages m
-  where m.id = p_message_id
-    and m.deleted_at is null
-  for update;
+select *
+into v_message
+from public.messages m
+where m.id = p_message_id
+  and m.deleted_at is null
+    for update;
 
-  if not found then
+if not found then
     return;
-  end if;
+end if;
 
   if v_message.sender_id <> auth.uid() then
     raise exception 'Only the sender can delete this message' using errcode = '42501';
-  end if;
+end if;
 
   if not public.is_conversation_member(v_message.conversation_id) then
     raise exception 'Conversation access denied' using errcode = '42501';
-  end if;
+end if;
 
-  update public.messages
-  set deleted_at = now()
-  where id = p_message_id;
+update public.messages
+set deleted_at = now()
+where id = p_message_id;
 end;
 $$;
 
@@ -384,15 +442,15 @@ $$;
 --
 
 CREATE TABLE public.messages (
-    id bigint NOT NULL,
-    conversation_id bigint NOT NULL,
-    sender_id uuid,
-    content text,
-    type text DEFAULT 'text'::text NOT NULL,
-    reply_to_message_id bigint,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    deleted_at timestamp with time zone,
-    edited_at timestamp with time zone
+                                 id bigint NOT NULL,
+                                 conversation_id bigint NOT NULL,
+                                 sender_id uuid,
+                                 content text,
+                                 type text DEFAULT 'text'::text NOT NULL,
+                                 reply_to_message_id bigint,
+                                 created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                 deleted_at timestamp with time zone,
+                                 edited_at timestamp with time zone
 );
 
 
@@ -405,45 +463,45 @@ CREATE FUNCTION public.edit_message(p_message_id bigint, p_new_content text) RET
     SET search_path TO 'public'
     AS $$
 declare
-  v_message public.messages;
+v_message public.messages;
   v_content text;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated' using errcode = '42501';
-  end if;
+end if;
 
   v_content := trim(coalesce(p_new_content, ''));
   if v_content = '' then
     raise exception 'Message cannot be empty';
-  end if;
+end if;
 
-  select *
-  into v_message
-  from public.messages m
-  where m.id = p_message_id
-    and m.deleted_at is null
-  for update;
+select *
+into v_message
+from public.messages m
+where m.id = p_message_id
+  and m.deleted_at is null
+    for update;
 
-  if not found then
+if not found then
     raise exception 'Message not found';
-  end if;
+end if;
 
   if v_message.sender_id <> auth.uid() then
     raise exception 'Only the sender can edit this message' using errcode = '42501';
-  end if;
+end if;
 
   if not public.is_conversation_member(v_message.conversation_id) then
     raise exception 'Conversation access denied' using errcode = '42501';
-  end if;
+end if;
 
-  update public.messages
-  set
+update public.messages
+set
     content = v_content,
     edited_at = now()
-  where id = p_message_id
-  returning * into v_message;
+where id = p_message_id
+    returning * into v_message;
 
-  return v_message;
+return v_message;
 end;
 $$;
 
@@ -457,7 +515,7 @@ CREATE FUNCTION public.evaluate_task_submission(p_task_id bigint, p_version_id b
     SET search_path TO 'public'
     AS $$
 declare
-  v_logic jsonb;
+v_logic jsonb;
   v_answers jsonb;
   v_vars jsonb;
   v_rules jsonb;
@@ -474,34 +532,34 @@ declare
   v_is_correct boolean;
   v_xp_factor numeric := 0;
 begin
-  select tv.logic
-    into v_logic
-  from public.task_versions tv
-  where tv.id = p_version_id
-    and tv.task_id = p_task_id;
+select tv.logic
+into v_logic
+from public.task_versions tv
+where tv.id = p_version_id
+  and tv.task_id = p_task_id;
 
-  if not found then
+if not found then
     raise exception 'Version % fuer Task % nicht gefunden', p_version_id, p_task_id;
-  end if;
+end if;
 
   if not public.quiz_logic_is_valid(v_logic) then
     raise exception 'Invalid logic JSON for task version %', p_version_id;
-  end if;
+end if;
 
   v_answers := case
     when p_answer_data ? 'answers' then coalesce(p_answer_data->'answers', '{}'::jsonb)
     else coalesce(p_answer_data, '{}'::jsonb)
-  end;
+end;
 
   v_vars := coalesce(p_answer_data->'vars', '{}'::jsonb);
   v_rules := coalesce(v_logic->'rules', '[]'::jsonb);
 
-  for v_rule in
-    select value
-    from jsonb_array_elements(case when jsonb_typeof(v_rules) = 'array' then v_rules else '[]'::jsonb end)
-  loop
+for v_rule in
+select value
+from jsonb_array_elements(case when jsonb_typeof(v_rules) = 'array' then v_rules else '[]'::jsonb end)
+         loop
     v_when := coalesce(v_rule->'when', '{"op":"true"}'::jsonb);
-    v_then := coalesce(v_rule->'then', '{}'::jsonb);
+v_then := coalesce(v_rule->'then', '{}'::jsonb);
     v_else := coalesce(v_rule->'else', '{}'::jsonb);
 
     v_passed := public.quiz_eval_condition(v_when, v_answers, v_vars, jsonb_build_object('now', now()::text));
@@ -511,45 +569,45 @@ begin
       if v_then ? 'add_score' then v_score := v_score + coalesce((v_then->>'add_score')::numeric, 0); end if;
       if v_then ? 'set_vars' and jsonb_typeof(v_then->'set_vars') = 'object' then
         v_vars := v_vars || (v_then->'set_vars');
-      end if;
+end if;
       if lower(coalesce(v_then->>'fail', 'false')) = 'true' then v_hard_fail := true; end if;
-    else
+else
       if v_else ? 'max_score' then v_max_score := v_max_score + coalesce((v_else->>'max_score')::numeric, 0); end if;
       if v_else ? 'add_score' then v_score := v_score + coalesce((v_else->>'add_score')::numeric, 0); end if;
       if v_else ? 'set_vars' and jsonb_typeof(v_else->'set_vars') = 'object' then
         v_vars := v_vars || (v_else->'set_vars');
-      end if;
+end if;
       if lower(coalesce(v_else->>'fail', 'false')) = 'true' then v_hard_fail := true; end if;
-    end if;
+end if;
 
     v_trace := v_trace || jsonb_build_array(jsonb_build_object(
       'rule_id', coalesce(v_rule->>'id', md5(v_rule::text)),
       'passed', v_passed
     ));
-  end loop;
+end loop;
 
   v_pass_threshold := nullif(coalesce(v_logic#>>'{pass,min_score}', ''), '')::numeric;
   if v_pass_threshold is null then
     v_pass_threshold := v_max_score;
-  end if;
+end if;
 
   v_is_correct := (not v_hard_fail) and (v_score >= coalesce(v_pass_threshold, 0));
 
   if v_max_score > 0 then
     v_xp_factor := greatest(least(v_score / v_max_score, 1), 0);
-  else
+else
     v_xp_factor := case when v_is_correct then 1 else 0 end;
-  end if;
+end if;
 
-  return jsonb_build_object(
-    'is_correct', v_is_correct,
-    'score', v_score,
-    'max_score', v_max_score,
-    'pass_threshold', coalesce(v_pass_threshold, 0),
-    'xp_factor', v_xp_factor,
-    'vars', v_vars,
-    'trace', v_trace
-  );
+return jsonb_build_object(
+        'is_correct', v_is_correct,
+        'score', v_score,
+        'max_score', v_max_score,
+        'pass_threshold', coalesce(v_pass_threshold, 0),
+        'xp_factor', v_xp_factor,
+        'vars', v_vars,
+        'trace', v_trace
+       );
 end;
 $$;
 
@@ -562,8 +620,8 @@ CREATE FUNCTION public.get_comments_with_like(p_video_id bigint, p_current_user 
     LANGUAGE plpgsql STABLE
     AS $$
 begin
-  return query
-  select
+return query
+select
     c.id,
     c.author_id,
     c.video_id,
@@ -574,19 +632,19 @@ begin
     c.like_count,
     row_to_json(p) as profiles,
     exists (
-      select 1
-      from public.comment_likes cl
-      where cl.comment_id = c.id and cl.user_id = p_current_user
+        select 1
+        from public.comment_likes cl
+        where cl.comment_id = c.id and cl.user_id = p_current_user
     ) as liked_by_current_user
-  from public.comments c
-  join public.profiles p on p.id = c.author_id
-  where c.video_id = p_video_id
-    and (
-      (p_parent_id is null and c.parent_id is null)
-      or (p_parent_id is not null and c.parent_id = p_parent_id)
+from public.comments c
+         join public.profiles p on p.id = c.author_id
+where c.video_id = p_video_id
+  and (
+    (p_parent_id is null and c.parent_id is null)
+        or (p_parent_id is not null and c.parent_id = p_parent_id)
     )
-  order by c.like_count desc
-  limit p_limit offset p_offset;
+order by c.like_count desc
+    limit p_limit offset p_offset;
 end;
 $$;
 
@@ -598,13 +656,13 @@ $$;
 CREATE FUNCTION public.get_conversation_bot(p_conversation_id bigint) RETURNS uuid
     LANGUAGE sql STABLE SECURITY DEFINER
     AS $$
-  select p.id
-  from conversation_members cm
-  join profiles p
-    on p.id = cm.profile_id
-  where cm.conversation_id = p_conversation_id
-    and p.is_bot = true
-  limit 1;
+select p.id
+from conversation_members cm
+         join profiles p
+              on p.id = cm.profile_id
+where cm.conversation_id = p_conversation_id
+  and p.is_bot = true
+    limit 1;
 $$;
 
 
@@ -613,8 +671,8 @@ $$;
 --
 
 CREATE TABLE public.video_tags (
-    video_id bigint NOT NULL,
-    tag_id integer NOT NULL
+                                   video_id bigint NOT NULL,
+                                   tag_id integer NOT NULL
 );
 
 
@@ -625,20 +683,20 @@ CREATE TABLE public.video_tags (
 CREATE FUNCTION public.get_filtered_video_tags(p_tag_name text, p_user_id uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 20, p_offset integer DEFAULT 0) RETURNS SETOF public.video_tags
     LANGUAGE sql STABLE
     AS $$
-  SELECT vt.*
-  FROM video_tags vt
-  JOIN tags t ON t.id = vt.tag_id 
-  WHERE t.name = p_tag_name
-    AND (
-      p_user_id IS NULL OR NOT EXISTS (
+SELECT vt.*
+FROM video_tags vt
+         JOIN tags t ON t.id = vt.tag_id
+WHERE t.name = p_tag_name
+  AND (
+    p_user_id IS NULL OR NOT EXISTS (
         SELECT 1
         FROM user_interactions ui
         WHERE ui.video_id = vt.video_id
           AND ui.user_id = p_user_id
-      )
     )
-  OFFSET p_offset
-  LIMIT p_limit;
+    )
+OFFSET p_offset
+    LIMIT p_limit;
 $$;
 
 
@@ -671,15 +729,15 @@ CREATE FUNCTION public.get_following_count(user_id uuid) RETURNS integer
 --
 
 CREATE TABLE public.message_versions (
-    id bigint NOT NULL,
-    message_id bigint NOT NULL,
-    conversation_id bigint NOT NULL,
-    version_no integer NOT NULL,
-    content text NOT NULL,
-    edited_at timestamp with time zone DEFAULT now() NOT NULL,
-    edited_by uuid,
-    change_type text DEFAULT 'edit'::text NOT NULL,
-    CONSTRAINT message_versions_change_type_check CHECK ((change_type = ANY (ARRAY['initial'::text, 'edit'::text, 'delete'::text])))
+                                         id bigint NOT NULL,
+                                         message_id bigint NOT NULL,
+                                         conversation_id bigint NOT NULL,
+                                         version_no integer NOT NULL,
+                                         content text NOT NULL,
+                                         edited_at timestamp with time zone DEFAULT now() NOT NULL,
+                                         edited_by uuid,
+                                         change_type text DEFAULT 'edit'::text NOT NULL,
+                                         CONSTRAINT message_versions_change_type_check CHECK ((change_type = ANY (ARRAY['initial'::text, 'edit'::text, 'delete'::text])))
 );
 
 
@@ -692,15 +750,15 @@ CREATE FUNCTION public.get_message_versions(p_message_id bigint) RETURNS SETOF p
     SET search_path TO 'public'
     AS $$
 declare
-  v_conv_id bigint;
+v_conv_id bigint;
 begin
-  select conversation_id into v_conv_id
-  from public.messages
-  where id = p_message_id;
+select conversation_id into v_conv_id
+from public.messages
+where id = p_message_id;
 
-  if not public.is_current_user_admin() and not coalesce(public.is_conversation_member(v_conv_id), false) then
+if not public.is_current_user_admin() and not coalesce(public.is_conversation_member(v_conv_id), false) then
     raise exception 'Only admins or participants can access message history' using errcode = '42501';
-  end if;
+end if;
 
 return query
 select mv.*
@@ -726,20 +784,20 @@ CREATE FUNCTION public.get_my_jwt_sub() RETURNS text
 --
 
 CREATE TABLE public.videos (
-    id bigint NOT NULL,
-    author_id uuid NOT NULL,
-    title character varying(100),
-    description text,
-    video_url text NOT NULL,
-    thumbnail_url text,
-    duration_s bigint,
-    view_count bigint NOT NULL,
-    like_count bigint NOT NULL,
-    is_published boolean DEFAULT true,
-    created_at timestamp with time zone DEFAULT now(),
-    comment_count smallint NOT NULL,
-    is_youtube boolean DEFAULT false NOT NULL,
-    fts tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, (((COALESCE(title, ''::character varying))::text || ' '::text) || COALESCE(description, ''::text)))) STORED
+                               id bigint NOT NULL,
+                               author_id uuid NOT NULL,
+                               title character varying(100),
+                               description text,
+                               video_url text NOT NULL,
+                               thumbnail_url text,
+                               duration_s bigint,
+                               view_count bigint NOT NULL,
+                               like_count bigint NOT NULL,
+                               is_published boolean DEFAULT true,
+                               created_at timestamp with time zone DEFAULT now(),
+                               comment_count smallint NOT NULL,
+                               is_youtube boolean DEFAULT false NOT NULL,
+                               fts tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, (((COALESCE(title, ''::character varying))::text || ' '::text) || COALESCE(description, ''::text)))) STORED
 );
 
 
@@ -765,21 +823,21 @@ CREATE FUNCTION public.get_new_videos(p_user_id uuid DEFAULT NULL::uuid, p_curso
     LANGUAGE plpgsql STABLE
     AS $$
 BEGIN
-  RETURN QUERY
-  SELECT v.*
-  FROM videos v
-  WHERE v.is_published = true
-    AND (p_cursor IS NULL OR v.created_at < p_cursor)
-    AND (
-      NOT p_only_unseen 
-      OR p_user_id IS NULL 
-      OR NOT EXISTS (
-        SELECT 1 FROM user_interactions ui 
+RETURN QUERY
+SELECT v.*
+FROM videos v
+WHERE v.is_published = true
+  AND (p_cursor IS NULL OR v.created_at < p_cursor)
+  AND (
+    NOT p_only_unseen
+        OR p_user_id IS NULL
+        OR NOT EXISTS (
+        SELECT 1 FROM user_interactions ui
         WHERE ui.video_id = v.id AND ui.user_id = p_user_id
-      )
     )
-  ORDER BY v.created_at DESC
-  LIMIT p_limit;
+    )
+ORDER BY v.created_at DESC
+    LIMIT p_limit;
 END;
 $$;
 
@@ -791,40 +849,40 @@ $$;
 CREATE FUNCTION public.get_task_ui_schema_v1() RETURNS jsonb
     LANGUAGE sql STABLE
     AS $_$
-  select jsonb_build_object(
-    '$schema', 'https://json-schema.org/draft/2020-12/schema',
-    'title', 'Task UI Schema v1',
-    'type', 'object',
-    'required', jsonb_build_array('version', 'screens'),
-    'properties', jsonb_build_object(
-      'version', jsonb_build_object('type', 'string', 'const', '1.0'),
-      'theme', jsonb_build_object('type', 'object'),
-      'screens', jsonb_build_object(
-        'type', 'array',
-        'items', jsonb_build_object(
-          'type', 'object',
-          'required', jsonb_build_array('id', 'elements'),
-          'properties', jsonb_build_object(
-            'id', jsonb_build_object('type', 'string'),
-            'animation', jsonb_build_object('type', 'object'),
-            'elements', jsonb_build_object(
-              'type', 'array',
-              'items', jsonb_build_object(
-                'type', 'object',
-                'required', jsonb_build_array('type', 'id'),
-                'properties', jsonb_build_object(
-                  'id', jsonb_build_object('type', 'string'),
-                  'type', jsonb_build_object('type', 'string'),
-                  'props', jsonb_build_object('type', 'object'),
-                  'bind', jsonb_build_object('type', 'object')
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-  );
+select jsonb_build_object(
+               '$schema', 'https://json-schema.org/draft/2020-12/schema',
+               'title', 'Task UI Schema v1',
+               'type', 'object',
+               'required', jsonb_build_array('version', 'screens'),
+               'properties', jsonb_build_object(
+                       'version', jsonb_build_object('type', 'string', 'const', '1.0'),
+                       'theme', jsonb_build_object('type', 'object'),
+                       'screens', jsonb_build_object(
+                               'type', 'array',
+                               'items', jsonb_build_object(
+                                       'type', 'object',
+                                       'required', jsonb_build_array('id', 'elements'),
+                                       'properties', jsonb_build_object(
+                                               'id', jsonb_build_object('type', 'string'),
+                                               'animation', jsonb_build_object('type', 'object'),
+                                               'elements', jsonb_build_object(
+                                                       'type', 'array',
+                                                       'items', jsonb_build_object(
+                                                               'type', 'object',
+                                                               'required', jsonb_build_array('type', 'id'),
+                                                               'properties', jsonb_build_object(
+                                                                       'id', jsonb_build_object('type', 'string'),
+                                                                       'type', jsonb_build_object('type', 'string'),
+                                                                       'props', jsonb_build_object('type', 'object'),
+                                                                       'bind', jsonb_build_object('type', 'object')
+                                                                             )
+                                                                )
+                                                           )
+                                                     )
+                                        )
+                                  )
+                             )
+       );
 $_$;
 
 
@@ -836,20 +894,20 @@ CREATE FUNCTION public.get_trending_candidates(p_user_id uuid DEFAULT NULL::uuid
     LANGUAGE plpgsql STABLE
     AS $$BEGIN
   RETURN QUERY
-  SELECT DISTINCT v.*
-  FROM videos v
-  WHERE v.is_published = true
-    AND v.created_at >= (NOW() - (p_days_back || ' days')::interval)
-    AND (p_cursor IS NULL OR v.created_at < p_cursor)
-    AND (
-      NOT p_only_unseen 
-      OR NOT EXISTS (
-        SELECT 1 FROM user_interactions ui 
+SELECT DISTINCT v.*
+FROM videos v
+WHERE v.is_published = true
+  AND v.created_at >= (NOW() - (p_days_back || ' days')::interval)
+  AND (p_cursor IS NULL OR v.created_at < p_cursor)
+  AND (
+    NOT p_only_unseen
+        OR NOT EXISTS (
+        SELECT 1 FROM user_interactions ui
         WHERE ui.video_id = v.id AND ui.user_id = p_user_id
-      )
     )
-  ORDER BY v.created_at DESC
-  LIMIT p_limit;
+    )
+ORDER BY v.created_at DESC
+    LIMIT p_limit;
 END;$$;
 
 
@@ -861,7 +919,7 @@ CREATE FUNCTION public.get_trending_candidates(p_days_back integer, p_cursor tim
     LANGUAGE plpgsql
     AS $$DECLARE
   has_youtube_access boolean;
-  effective_use_youtube boolean;
+effective_use_youtube boolean;
 BEGIN
   has_youtube_access := EXISTS (
     SELECT 1 FROM pro_users pu
@@ -870,30 +928,30 @@ BEGIN
 
   effective_use_youtube :=  COALESCE(p_use_youtube, false) AND has_youtube_access;
 
-  RETURN QUERY
-  SELECT DISTINCT v.*
-  FROM videos v
-  WHERE v.is_published = true
-    AND v.created_at >= (NOW() - (p_days_back || ' days')::interval)
-    AND (p_cursor IS NULL OR v.created_at < p_cursor)
-    AND (
-      NOT p_only_unseen 
-      OR NOT EXISTS (
-        SELECT 1 
-        FROM user_interactions ui 
-        WHERE ui.video_id = v.id 
+RETURN QUERY
+SELECT DISTINCT v.*
+FROM videos v
+WHERE v.is_published = true
+  AND v.created_at >= (NOW() - (p_days_back || ' days')::interval)
+  AND (p_cursor IS NULL OR v.created_at < p_cursor)
+  AND (
+    NOT p_only_unseen
+        OR NOT EXISTS (
+        SELECT 1
+        FROM user_interactions ui
+        WHERE ui.video_id = v.id
           AND ui.user_id = p_user_id
-      )
     )
-    AND (
-      CASE 
+    )
+  AND (
+    CASE
         WHEN p_use_youtube = true AND has_youtube_access
-          THEN v.is_youtube = true
+            THEN v.is_youtube = true
         ELSE v.is_youtube = false
-      END
+        END
     )
-  ORDER BY v.created_at DESC
-  LIMIT p_limit;
+ORDER BY v.created_at DESC
+    LIMIT p_limit;
 END;$$;
 
 
@@ -905,24 +963,24 @@ CREATE FUNCTION public.get_videos_by_tag(p_tag_name text, p_user_id uuid DEFAULT
     LANGUAGE plpgsql STABLE
     AS $$
 BEGIN
-  RETURN QUERY
-  SELECT v.*
-  FROM videos v
-  JOIN video_tags vt ON vt.video_id = v.id
-  JOIN tags t ON t.id = vt.tag_id
-  WHERE t.name = p_tag_name
-    AND v.is_published = true
-    AND (
-      NOT p_only_unseen 
-      OR p_user_id IS NULL 
-      OR NOT EXISTS (
-        SELECT 1 FROM user_interactions ui 
+RETURN QUERY
+SELECT v.*
+FROM videos v
+         JOIN video_tags vt ON vt.video_id = v.id
+         JOIN tags t ON t.id = vt.tag_id
+WHERE t.name = p_tag_name
+  AND v.is_published = true
+  AND (
+    NOT p_only_unseen
+        OR p_user_id IS NULL
+        OR NOT EXISTS (
+        SELECT 1 FROM user_interactions ui
         WHERE ui.video_id = v.id AND ui.user_id = p_user_id
-      )
     )
-  ORDER BY v.created_at DESC
-  LIMIT p_limit
-  OFFSET p_offset;
+    )
+ORDER BY v.created_at DESC
+    LIMIT p_limit
+OFFSET p_offset;
 END;
 $$;
 
@@ -935,15 +993,15 @@ CREATE FUNCTION public.increment_video_metric(p_video_id bigint, p_column text, 
     LANGUAGE plpgsql
     SET search_path TO 'public'
     AS $_$begin
-  if p_column not in ('like_count', 'view_count', 'comment_count') then
+  if p_column not in ('view_count') then
     raise exception 'unsupported video metric %', p_column;
-  end if;
+end if;
 
-  execute format(
-    'update videos set %I = greatest(coalesce(%I, 0) + $1, 0) where id = $2',
-    p_column,
-    p_column
-  ) using p_delta, p_video_id;
+execute format(
+        'update videos set %I = greatest(coalesce(%I, 0) + $1, 0) where id = $2',
+        p_column,
+        p_column
+        ) using p_delta, p_video_id;
 end;$_$;
 
 
@@ -955,12 +1013,12 @@ CREATE FUNCTION public.is_conversation_member(p_conversation_id bigint) RETURNS 
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-  select exists(
+select exists(
     select 1
     from public.conversation_members cm
     where cm.conversation_id = p_conversation_id
       and cm.profile_id = auth.uid()
-  );
+);
 $$;
 
 
@@ -971,12 +1029,12 @@ $$;
 CREATE FUNCTION public.is_conversation_member(p_conversation_id bigint, p_user_id uuid) RETURNS boolean
     LANGUAGE sql STABLE SECURITY DEFINER
     AS $$
-  select exists (
+select exists (
     select 1
     from conversation_members
     where conversation_id = p_conversation_id
       and profile_id = p_user_id
-  );
+);
 $$;
 
 
@@ -988,9 +1046,9 @@ CREATE FUNCTION public.is_current_user_admin() RETURNS boolean
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-  select coalesce((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin', false)
-      or coalesce((auth.jwt() ->> 'role') = 'admin', false)
-      or auth.role() = 'service_role';
+select coalesce((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin', false)
+           or coalesce((auth.jwt() ->> 'role') = 'admin', false)
+           or auth.role() = 'service_role';
 $$;
 
 
@@ -1001,11 +1059,11 @@ $$;
 CREATE FUNCTION public.is_pro(p_user_id uuid) RETURNS boolean
     LANGUAGE sql STABLE SECURITY DEFINER
     AS $$
-  select exists (
+select exists (
     select 1
     from pro_users
     where user_id = p_user_id
-  );
+);
 $$;
 
 
@@ -1018,7 +1076,7 @@ CREATE FUNCTION public.moderate_message() RETURNS trigger
     SET search_path TO 'public'
     AS $$
 declare
-  v_warning_count integer;
+v_warning_count integer;
 begin
   if new.content is not null
      and public.contains_banned_word(new.content)
@@ -1033,22 +1091,22 @@ begin
       'Used banned word'
     );
 
-    select count(*)
-    into v_warning_count
-    from public.user_warnings
-    where user_id = new.sender_id
-    AND created_at > CURRENT_DATE - INTERVAL '48 days';
+select count(*)
+into v_warning_count
+from public.user_warnings
+where user_id = new.sender_id
+  AND created_at > CURRENT_DATE - INTERVAL '48 days';
 
-    if v_warning_count >= 3 then
-      update public.profiles
-      set is_banned = true
-      where id = new.sender_id;
-    end if;
+if v_warning_count >= 3 then
+update public.profiles
+set is_banned = true
+where id = new.sender_id;
+end if;
 
     raise exception 'MESSAGE_MODERATION_VIOLATION';
-  end if;
+end if;
 
-  return new;
+return new;
 end;
 $$;
 
@@ -1062,7 +1120,7 @@ CREATE FUNCTION public.post_comment(p_author_id uuid, p_video_id bigint, p_conte
     SET search_path TO 'public'
     AS $$declare
   new_comment_id bigint;
-  v_warning_count integer;
+v_warning_count integer;
   v_is_now_banned boolean;
 begin
 
@@ -1073,7 +1131,7 @@ begin
       and is_banned = true
   ) then
     return -5000;
-  end if;
+end if;
 
   if public.contains_banned_word(p_content) then
 
@@ -1086,35 +1144,35 @@ begin
       'Used banned word (' || p_content || ')'
     );
 
-    select count(*)
-    into v_warning_count
-    from user_warnings
-    where user_id = auth.uid();
+select count(*)
+into v_warning_count
+from user_warnings
+where user_id = auth.uid();
 
-    v_is_now_banned := v_warning_count >= 3;
+v_is_now_banned := v_warning_count >= 3;
 
     if v_is_now_banned then
-      update profiles
-      set is_banned = true
-      where id = auth.uid();
-      return -5000 - v_warning_count;
-    end if;
+update profiles
+set is_banned = true
+where id = auth.uid();
+return -5000 - v_warning_count;
+end if;
 
-    return -1000 - v_warning_count;
-  end if;
+return -1000 - v_warning_count;
+end if;
 
 
-  insert into public.comments (author_id, video_id, content, parent_id)
-  values (p_author_id, p_video_id, p_content, p_parent_id)
-  returning id into new_comment_id;
+insert into public.comments (author_id, video_id, content, parent_id)
+values (p_author_id, p_video_id, p_content, p_parent_id)
+    returning id into new_comment_id;
 
-  update public.videos set comment_count = comment_count + 1 where id = p_video_id;
+update public.videos set comment_count = comment_count + 1 where id = p_video_id;
 
-  if p_parent_id is not null then
-    update public.comments set reply_count = reply_count + 1 where id = p_parent_id;
-  end if;
+if p_parent_id is not null then
+update public.comments set reply_count = reply_count + 1 where id = p_parent_id;
+end if;
 
-  return new_comment_id;
+return new_comment_id;
 end;$$;
 
 
@@ -1127,37 +1185,37 @@ CREATE FUNCTION public.publish_task_version(p_task_id bigint, p_version_id bigin
     SET search_path TO 'public'
     AS $$
 declare
-  v_uid uuid := auth.uid();
+v_uid uuid := auth.uid();
   v_row public.task_versions;
 begin
   if v_uid is null then
     raise exception 'Not authenticated';
-  end if;
+end if;
 
   if not exists (
     select 1 from public.tasks t where t.id = p_task_id and t.created_by = v_uid
   ) then
     raise exception 'Only owner can publish versions';
-  end if;
+end if;
 
-  update public.task_versions
-  set status = 'published',
-      published_at = now()
-  where id = p_version_id
-    and task_id = p_task_id
-  returning * into v_row;
+update public.task_versions
+set status = 'published',
+    published_at = now()
+where id = p_version_id
+  and task_id = p_task_id
+    returning * into v_row;
 
-  if not found then
+if not found then
     raise exception 'Version not found';
-  end if;
+end if;
 
   if p_make_current then
-    update public.tasks
-    set current_version_id = p_version_id
-    where id = p_task_id;
-  end if;
+update public.tasks
+set current_version_id = p_version_id
+where id = p_task_id;
+end if;
 
-  return v_row;
+return v_row;
 end;
 $$;
 
@@ -1170,7 +1228,7 @@ CREATE FUNCTION public.quiz_eval_condition(p_cond jsonb, p_answers jsonb, p_vars
     LANGUAGE plpgsql STABLE
     AS $$
 declare
-  v_op text;
+v_op text;
   v_left jsonb;
   v_right jsonb;
   v_num_left numeric;
@@ -1188,25 +1246,25 @@ begin
     return not public.quiz_eval_condition(coalesce(p_cond->'arg', '{"op":"false"}'::jsonb), p_answers, p_vars, p_ctx);
   elsif v_op = 'and' then
     for v_arg in
-      select value
-      from jsonb_array_elements(case when jsonb_typeof(p_cond->'args') = 'array' then p_cond->'args' else '[]'::jsonb end)
-    loop
-      if not public.quiz_eval_condition(v_arg, p_answers, p_vars, p_ctx) then
+select value
+from jsonb_array_elements(case when jsonb_typeof(p_cond->'args') = 'array' then p_cond->'args' else '[]'::jsonb end)
+         loop
+    if not public.quiz_eval_condition(v_arg, p_answers, p_vars, p_ctx) then
         return false;
-      end if;
-    end loop;
-    return true;
-  elsif v_op = 'or' then
+end if;
+end loop;
+return true;
+elsif v_op = 'or' then
     for v_arg in
-      select value
-      from jsonb_array_elements(case when jsonb_typeof(p_cond->'args') = 'array' then p_cond->'args' else '[]'::jsonb end)
-    loop
-      if public.quiz_eval_condition(v_arg, p_answers, p_vars, p_ctx) then
+select value
+from jsonb_array_elements(case when jsonb_typeof(p_cond->'args') = 'array' then p_cond->'args' else '[]'::jsonb end)
+         loop
+    if public.quiz_eval_condition(v_arg, p_answers, p_vars, p_ctx) then
         return true;
-      end if;
-    end loop;
-    return false;
-  end if;
+end if;
+end loop;
+return false;
+end if;
 
   v_left := public.quiz_ref_value(p_cond->'left', p_answers, p_vars, p_ctx);
   v_right := public.quiz_ref_value(p_cond->'right', p_answers, p_vars, p_ctx);
@@ -1221,23 +1279,23 @@ begin
 
     if v_num_left is null or v_num_right is null then
       return false;
-    end if;
+end if;
 
     if v_op = 'gt' then return v_num_left > v_num_right; end if;
     if v_op = 'gte' then return v_num_left >= v_num_right; end if;
     if v_op = 'lt' then return v_num_left < v_num_right; end if;
-    return v_num_left <= v_num_right;
-  elsif v_op = 'in' then
+return v_num_left <= v_num_right;
+elsif v_op = 'in' then
     v_list := v_right;
     if jsonb_typeof(v_list) <> 'array' then
       return false;
-    end if;
-    return exists (
-      select 1
-      from jsonb_array_elements(v_list) e
-      where e.value = v_left
-    );
-  elsif v_op = 'contains' then
+end if;
+return exists (
+    select 1
+    from jsonb_array_elements(v_list) e
+    where e.value = v_left
+);
+elsif v_op = 'contains' then
     if jsonb_typeof(v_left) = 'array' then
       return exists (
         select 1
@@ -1246,16 +1304,16 @@ begin
       );
     elsif jsonb_typeof(v_left) = 'string' then
       return position(coalesce(v_right #>> '{}', '') in coalesce(v_left #>> '{}', '')) > 0;
-    else
+else
       return false;
-    end if;
+end if;
   elsif v_op = 'regex' then
     return coalesce(v_left #>> '{}', '') ~ coalesce(v_right #>> '{}', '');
   elsif v_op = 'exists' then
     return v_left is not null and v_left <> 'null'::jsonb;
-  end if;
+end if;
 
-  return false;
+return false;
 end;
 $$;
 
@@ -1267,16 +1325,16 @@ $$;
 CREATE FUNCTION public.quiz_logic_is_valid(p_logic jsonb) RETURNS boolean
     LANGUAGE sql IMMUTABLE
     AS $$
-  select
+select
     jsonb_typeof(p_logic) = 'object'
-    and (
-      not (p_logic ? 'rules')
-      or jsonb_typeof(p_logic->'rules') = 'array'
-    )
-    and (
-      not (p_logic ? 'pass')
-      or jsonb_typeof(p_logic->'pass') = 'object'
-    );
+        and (
+        not (p_logic ? 'rules')
+            or jsonb_typeof(p_logic->'rules') = 'array'
+        )
+        and (
+        not (p_logic ? 'pass')
+            or jsonb_typeof(p_logic->'pass') = 'object'
+        );
 $$;
 
 
@@ -1288,32 +1346,32 @@ CREATE FUNCTION public.quiz_ref_value(p_ref jsonb, p_answers jsonb, p_vars jsonb
     LANGUAGE plpgsql IMMUTABLE
     AS $$
 declare
-  v_source text;
+v_source text;
   v_path text;
   v_path_arr text[];
 begin
   if p_ref is null then
     return 'null'::jsonb;
-  end if;
+end if;
 
   if jsonb_typeof(p_ref) <> 'object' then
     return p_ref;
-  end if;
+end if;
 
   if p_ref ? 'const' then
     return p_ref->'const';
-  end if;
+end if;
 
   v_source := coalesce(p_ref->>'source', 'answers');
   v_path := coalesce(p_ref->>'path', '');
   v_path_arr := case when v_path = '' then array[]::text[] else string_to_array(v_path, '.') end;
 
-  case v_source
+case v_source
     when 'answers' then return coalesce(p_answers #> v_path_arr, 'null'::jsonb);
-    when 'vars' then return coalesce(p_vars #> v_path_arr, 'null'::jsonb);
-    when 'ctx' then return coalesce(p_ctx #> v_path_arr, 'null'::jsonb);
-    else return 'null'::jsonb;
-  end case;
+when 'vars' then return coalesce(p_vars #> v_path_arr, 'null'::jsonb);
+when 'ctx' then return coalesce(p_ctx #> v_path_arr, 'null'::jsonb);
+else return 'null'::jsonb;
+end case;
 end;
 $$;
 
@@ -1326,60 +1384,28 @@ CREATE FUNCTION public.quiz_to_numeric(p_val jsonb) RETURNS numeric
     LANGUAGE plpgsql IMMUTABLE
     AS $_$
 declare
-  v_text text;
+v_text text;
 begin
   if p_val is null or p_val = 'null'::jsonb then
     return null;
-  end if;
+end if;
 
   if jsonb_typeof(p_val) = 'number' then
     return (p_val::text)::numeric;
-  end if;
+end if;
 
   v_text := p_val #>> '{}';
   if v_text is null then
     return null;
-  end if;
+end if;
 
   if v_text ~ '^-?[0-9]+(\.[0-9]+)?$' then
     return v_text::numeric;
-  end if;
+end if;
 
-  return null;
+return null;
 end;
 $_$;
-
-
---
--- Name: refresh_conversation_last_message(integer); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.refresh_conversation_last_message(p_conversation_id integer) RETURNS void
-    LANGUAGE plpgsql SECURITY DEFINER
-    AS $$DECLARE
-v_last_message text;
-v_last_updated_at timestamp;
-BEGIN
-  SELECT content, created_at
-    INTO v_last_message, v_last_updated_at
-    FROM messages
-    WHERE deleted_at IS NULL
-    AND conversation_id = p_conversation_id
-    ORDER BY created_at DESC
-    LIMIT 1;
-
-  v_last_message := coalesce(v_last_message, '');
-
-  v_last_updated_at := coalesce(
-    v_last_updated_at,
-    (SELECT updated_at FROM conversations WHERE id = p_conversation_id)
-  );
-
-  UPDATE conversations
-    SET last_message = v_last_message,
-    updated_at = v_last_updated_at
-  WHERE id = p_conversation_id;
-END;$$;
 
 
 --
@@ -1391,25 +1417,25 @@ CREATE FUNCTION public.refresh_conversation_last_message(p_conversation_id bigin
     SET search_path TO 'public'
     AS $$
 declare
-  v_last_sender uuid;
+v_last_sender uuid;
   v_last_content text;
 begin
-  select m.sender_id, m.content
-  into v_last_sender, v_last_content
-  from public.messages m
-  where m.conversation_id = p_conversation_id
-    and m.deleted_at is null
-  order by m.created_at desc
-  limit 1;
+select m.sender_id, m.content
+into v_last_sender, v_last_content
+from public.messages m
+where m.conversation_id = p_conversation_id
+  and m.deleted_at is null
+order by m.created_at desc
+    limit 1;
 
-  update public.conversations
-  set
+update public.conversations
+set
     updated_at = now(),
     last_message = case
-      when v_last_sender is null then ''
-      else v_last_sender::text || ': ' || coalesce(v_last_content, '')
-    end
-  where id = p_conversation_id;
+                       when v_last_sender is null then ''
+                       else v_last_sender::text || ': ' || coalesce(v_last_content, '')
+end
+where id = p_conversation_id;
 end;
 $$;
 
@@ -1424,9 +1450,9 @@ CREATE FUNCTION public.request_pro_tier(key text) RETURNS boolean
   IF key = '[SECRET_KEY]'
   THEN 
     INSERT INTO pro_users (user_id, created_at) VALUES ((select auth.uid() as uid), now());
-    RETURN TRUE;
-  END IF;
-  RETURN FALSE;
+RETURN TRUE;
+END IF;
+RETURN FALSE;
 END$$;
 
 
@@ -1438,22 +1464,22 @@ CREATE FUNCTION public.request_streak_update() RETURNS integer
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$DECLARE
     v_streak integer;
-    v_best_streak integer;
+v_best_streak integer;
     v_updated_at timestamptz;
     v_has_interaction_today boolean;
 BEGIN
 
-    SELECT EXISTS (
-        SELECT 1
-        FROM user_interactions
-        WHERE user_id = auth.uid()
-          AND created_at >= CURRENT_DATE
-    )
-    INTO v_has_interaction_today;
+SELECT EXISTS (
+    SELECT 1
+    FROM user_interactions
+    WHERE user_id = auth.uid()
+      AND created_at >= CURRENT_DATE
+)
+INTO v_has_interaction_today;
 
-    IF NOT v_has_interaction_today THEN
+IF NOT v_has_interaction_today THEN
         RETURN 0;
-    END IF;
+END IF;
 
     IF NOT EXISTS (
         SELECT 1
@@ -1474,51 +1500,51 @@ BEGIN
             now()
         );
 
-        RETURN 1;
-    END IF;
+RETURN 1;
+END IF;
 
-    SELECT
-        streak,
-        best_streak,
-        updated_at
-    INTO
-        v_streak,
-        v_best_streak,
-        v_updated_at
-    FROM user_streaks
-    WHERE user_id = auth.uid()
+SELECT
+    streak,
+    best_streak,
+    updated_at
+INTO
+    v_streak,
+    v_best_streak,
+    v_updated_at
+FROM user_streaks
+WHERE user_id = auth.uid()
     LIMIT 1;
 
-    IF v_updated_at >= CURRENT_DATE THEN
+IF v_updated_at >= CURRENT_DATE THEN
         RETURN v_streak;
-    END IF;
+END IF;
 
     IF v_updated_at >= CURRENT_DATE - INTERVAL '1 day' THEN
         v_streak := v_streak + 1;
-    ELSE
+ELSE
         v_streak := 1;
-    END IF;
+END IF;
 
     v_best_streak := GREATEST(v_best_streak, v_streak);
 
-    UPDATE user_streaks
-    SET
-        streak = v_streak,
-        best_streak = v_best_streak,
-        updated_at = now()
-    WHERE user_id = auth.uid();
+UPDATE user_streaks
+SET
+    streak = v_streak,
+    best_streak = v_best_streak,
+    updated_at = now()
+WHERE user_id = auth.uid();
 
-    SELECT
-        streak
-    INTO
-        v_streak
-    FROM user_streaks
-    WHERE user_id = auth.uid()
+SELECT
+    streak
+INTO
+    v_streak
+FROM user_streaks
+WHERE user_id = auth.uid()
     LIMIT 1;
 
-    
 
-    RETURN v_streak;
+
+RETURN v_streak;
 END;$$;
 
 
@@ -1527,23 +1553,23 @@ END;$$;
 --
 
 CREATE TABLE public.profiles (
-    id uuid NOT NULL,
-    username character varying(30) NOT NULL,
-    display_name character varying(50),
-    avatar_url text,
-    bio character varying(150),
-    created_at timestamp with time zone DEFAULT now(),
-    followers_count integer DEFAULT 0 NOT NULL,
-    following_count integer DEFAULT 0 NOT NULL,
-    total_likes_count integer DEFAULT 0 NOT NULL,
-    total_videos_count integer DEFAULT 0 NOT NULL,
-    is_banned boolean DEFAULT false NOT NULL,
-    accepted_eula boolean DEFAULT false NOT NULL,
-    accepted_data_processing boolean DEFAULT false NOT NULL,
-    onboarding_completed boolean DEFAULT false NOT NULL,
-    is_bot boolean DEFAULT false NOT NULL,
-    CONSTRAINT profiles_followers_count_check CHECK ((followers_count >= 0)),
-    CONSTRAINT profiles_following_count_check CHECK ((following_count >= 0))
+                                 id uuid NOT NULL,
+                                 username character varying(30) NOT NULL,
+                                 display_name character varying(50),
+                                 avatar_url text,
+                                 bio character varying(150),
+                                 created_at timestamp with time zone DEFAULT now(),
+                                 followers_count integer DEFAULT 0 NOT NULL,
+                                 following_count integer DEFAULT 0 NOT NULL,
+                                 total_likes_count integer DEFAULT 0 NOT NULL,
+                                 total_videos_count integer DEFAULT 0 NOT NULL,
+                                 is_banned boolean DEFAULT false NOT NULL,
+                                 accepted_eula boolean DEFAULT false NOT NULL,
+                                 accepted_data_processing boolean DEFAULT false NOT NULL,
+                                 onboarding_completed boolean DEFAULT false NOT NULL,
+                                 is_bot boolean DEFAULT false NOT NULL,
+                                 CONSTRAINT profiles_followers_count_check CHECK ((followers_count >= 0)),
+                                 CONSTRAINT profiles_following_count_check CHECK ((following_count >= 0))
 );
 
 
@@ -1597,12 +1623,12 @@ CREATE FUNCTION public.search_profiles(search_query text, p_limit integer DEFAUL
     LANGUAGE sql STABLE
     SET search_path TO 'public'
     AS $$
-  SELECT p.*
-  FROM profiles p
-  WHERE
+SELECT p.*
+FROM profiles p
+WHERE
     p.username ILIKE '%' || search_query || '%'
     OR p.display_name ILIKE '%' || search_query || '%'
-  ORDER BY
+ORDER BY
     CASE WHEN LOWER(p.username) = LOWER(search_query) THEN 0 ELSE 1 END,
     CASE WHEN LOWER(p.username) LIKE LOWER(search_query) || '%' THEN 0 ELSE 1 END,
     CASE WHEN LOWER(p.display_name) LIKE LOWER(search_query) || '%' THEN 0 ELSE 1 END,
@@ -1853,7 +1879,7 @@ CREATE FUNCTION public.send_message(p_conversation_id bigint, p_content text) RE
     SET search_path TO 'public'
     AS $$
 declare
-  v_message public.messages;
+v_message public.messages;
 begin
 
   if exists (
@@ -1863,7 +1889,7 @@ begin
       and is_banned = true
   ) then
     raise exception 'USER_BANNED';
-  end if;
+end if;
 
   if public.contains_banned_word(p_content) then
 
@@ -1877,22 +1903,22 @@ begin
     );
 
     raise exception 'MESSAGE_MODERATION_VIOLATION';
-  end if;
+end if;
 
-  insert into public.messages (
+insert into public.messages (
     conversation_id,
     sender_id,
     content
-  )
-  values (
-    p_conversation_id,
-    auth.uid(),
-    p_content
-  )
-  returning *
-  into v_message;
+)
+values (
+           p_conversation_id,
+           auth.uid(),
+           p_content
+       )
+    returning *
+into v_message;
 
-  return v_message;
+return v_message;
 end;
 $$;
 
@@ -1906,7 +1932,7 @@ CREATE FUNCTION public.send_message(p_conversation_id bigint, p_content text, p_
     SET search_path TO 'public'
     AS $$
 declare
-  v_message public.messages;
+v_message public.messages;
   v_warning_count integer;
   v_is_now_banned boolean;
 begin
@@ -1922,7 +1948,7 @@ begin
       'is_banned', true,
       'error', 'USER_BANNED'
     );
-  end if;
+end if;
 
   if public.contains_banned_word(p_content) then
 
@@ -1935,46 +1961,46 @@ begin
       'Used banned word (' || p_content || ')'
     );
 
-    select count(*)
-    into v_warning_count
-    from user_warnings
-    where user_id = auth.uid();
+select count(*)
+into v_warning_count
+from user_warnings
+where user_id = auth.uid();
 
-    v_is_now_banned := v_warning_count >= 3;
+v_is_now_banned := v_warning_count >= 3;
 
     if v_is_now_banned then
-      update profiles
-      set is_banned = true
-      where id = auth.uid();
-    end if;
+update profiles
+set is_banned = true
+where id = auth.uid();
+end if;
 
-    return json_build_object(
-      'success', false,
-      'is_banned', v_is_now_banned,
-      'error', 'MESSAGE_MODERATION_VIOLATION',
-      'warning_count', v_warning_count
-    );
-  end if;
+return json_build_object(
+        'success', false,
+        'is_banned', v_is_now_banned,
+        'error', 'MESSAGE_MODERATION_VIOLATION',
+        'warning_count', v_warning_count
+       );
+end if;
 
-  insert into public.messages (
+insert into public.messages (
     conversation_id,
     sender_id,
     content,
     reply_to_message_id
-  )
-  values (
-    p_conversation_id,
-    auth.uid(),
-    p_content,
-    p_reply_to_message_id
-  )
-  returning *
-  into v_message;
+)
+values (
+           p_conversation_id,
+           auth.uid(),
+           p_content,
+           p_reply_to_message_id
+       )
+    returning *
+into v_message;
 
-  return json_build_object(
-    'success', true,
-    'message', row_to_json(v_message)
-  );
+return json_build_object(
+        'success', true,
+        'message', row_to_json(v_message)
+       );
 end;
 $$;
 
@@ -1988,14 +2014,14 @@ CREATE FUNCTION public.solve_task(p_task_id bigint, p_answer_data text) RETURNS 
     SET search_path TO 'public'
     AS $$
 declare
-  v_eval jsonb;
+v_eval jsonb;
 begin
   v_eval := public.solve_task_v2(
     p_task_id,
     coalesce(nullif(trim(p_answer_data), ''), '{}')::jsonb,
     null
   );
-  return coalesce((v_eval->>'is_correct')::boolean, false);
+return coalesce((v_eval->>'is_correct')::boolean, false);
 end;
 $$;
 
@@ -2008,36 +2034,36 @@ CREATE FUNCTION public.solve_task(p_answer_data jsonb, p_task_id bigint) RETURNS
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$DECLARE
   is_correct BOOLEAN;
-  task_data RECORD;
+task_data RECORD;
 BEGIN
-  SELECT EXISTS (
+SELECT EXISTS (
     SELECT 1
     FROM task_solutions ts
     WHERE ts.task_id = p_task_id
       AND ts.data = p_answer_data
-  )
-  INTO is_correct;
+)
+INTO is_correct;
 
-  SELECT subjects, xp_reward, xp_punishment
-  INTO task_data
-  FROM tasks
-  WHERE id = p_task_id;
+SELECT subjects, xp_reward, xp_punishment
+INTO task_data
+FROM tasks
+WHERE id = p_task_id;
 
-  IF is_correct THEN
-    UPDATE profile_levels
-    SET level = level + task_data.xp_reward
-    WHERE category = ANY(task_data.subjects)
-    AND user_id = (select auth.uid() as uid);
+IF is_correct THEN
+UPDATE profile_levels
+SET level = level + task_data.xp_reward
+WHERE category = ANY(task_data.subjects)
+  AND user_id = (select auth.uid() as uid);
 
-    RETURN true;
-  ELSE
-    UPDATE profile_levels
-    SET level = GREATEST(level - task_data.xp_punishment, 0)
-    WHERE category = ANY(task_data.subjects)
-    AND user_id = (select auth.uid() as uid);
-    
-    RETURN false;
-  END IF;
+RETURN true;
+ELSE
+UPDATE profile_levels
+SET level = GREATEST(level - task_data.xp_punishment, 0)
+WHERE category = ANY(task_data.subjects)
+  AND user_id = (select auth.uid() as uid);
+
+RETURN false;
+END IF;
 END;$$;
 
 
@@ -2050,7 +2076,7 @@ CREATE FUNCTION public.solve_task_v2(p_task_id bigint, p_answer_data jsonb, p_ve
     SET search_path TO 'public'
     AS $$
 declare
-  v_uid uuid := auth.uid();
+v_uid uuid := auth.uid();
   v_task record;
   v_version_id bigint;
   v_eval jsonb;
@@ -2063,21 +2089,21 @@ declare
 begin
   if v_uid is null then
     raise exception 'Not authenticated';
-  end if;
+end if;
 
-  select t.id, t.subjects, t.xp_reward, t.xp_punishment, t.current_version_id, t.created_by, t.visibility
-  into v_task
-  from public.tasks t
-  where t.id = p_task_id;
+select t.id, t.subjects, t.xp_reward, t.xp_punishment, t.current_version_id, t.created_by, t.visibility
+into v_task
+from public.tasks t
+where t.id = p_task_id;
 
-  if not found then
+if not found then
     raise exception 'Task % not found', p_task_id;
-  end if;
+end if;
 
   v_version_id := coalesce(p_version_id, v_task.current_version_id);
   if v_version_id is null then
     raise exception 'Task % has no current version', p_task_id;
-  end if;
+end if;
 
   if not exists (
     select 1
@@ -2087,7 +2113,7 @@ begin
       and (tv.status = 'published' or v_task.created_by = v_uid)
   ) then
     raise exception 'Version is not accessible';
-  end if;
+end if;
 
   v_eval := public.evaluate_task_submission(
     p_task_id,
@@ -2100,54 +2126,54 @@ begin
 
   if v_is_correct then
     v_delta := (v_task.xp_reward * greatest(least(v_xp_factor, 1), 0))::double precision;
-  else
+else
     v_delta := (-v_task.xp_punishment)::double precision;
-  end if;
+end if;
 
-  for v_subject in
-    select s from unnest(v_task.subjects) as s
-  loop
-    begin
-      insert into public.profile_levels(user_id, category, level)
-      values (v_uid, v_subject, 0)
-      on conflict (user_id, category) do nothing;
+for v_subject in
+select s from unnest(v_task.subjects) as s
+    loop
+begin
+insert into public.profile_levels(user_id, category, level)
+values (v_uid, v_subject, 0)
+    on conflict (user_id, category) do nothing;
 
-      if not (v_subject = any(v_valid_subjects)) then
+if not (v_subject = any(v_valid_subjects)) then
         v_valid_subjects := array_append(v_valid_subjects, v_subject);
-      end if;
-    exception
+end if;
+exception
       when foreign_key_violation then
         if not (v_subject = any(v_invalid_subjects)) then
           v_invalid_subjects := array_append(v_invalid_subjects, v_subject);
-        end if;
-    end;
-  end loop;
+end if;
+end;
+end loop;
 
   if v_delta >= 0 then
-    update public.profile_levels
-      set level = level + v_delta
-    where user_id = v_uid
-      and category = any(v_valid_subjects);
-  else
-    update public.profile_levels
-      set level = greatest(level + v_delta, 0)
-    where user_id = v_uid
-      and category = any(v_valid_subjects);
-  end if;
+update public.profile_levels
+set level = level + v_delta
+where user_id = v_uid
+  and category = any(v_valid_subjects);
+else
+update public.profile_levels
+set level = greatest(level + v_delta, 0)
+where user_id = v_uid
+  and category = any(v_valid_subjects);
+end if;
 
-  insert into public.task_attempts(
+insert into public.task_attempts(
     task_id, version_id, user_id, answer_data, evaluation, is_correct, xp_delta
-  ) values (
-    p_task_id, v_version_id, v_uid, coalesce(p_answer_data, '{}'::jsonb), v_eval, v_is_correct, v_delta
-  );
+) values (
+             p_task_id, v_version_id, v_uid, coalesce(p_answer_data, '{}'::jsonb), v_eval, v_is_correct, v_delta
+         );
 
-  return v_eval || jsonb_build_object(
-    'task_id', p_task_id,
-    'version_id', v_version_id,
-    'xp_delta', v_delta,
-    'applied_subjects', to_jsonb(v_valid_subjects),
-    'ignored_subjects', to_jsonb(v_invalid_subjects)
-  );
+return v_eval || jsonb_build_object(
+        'task_id', p_task_id,
+        'version_id', v_version_id,
+        'xp_delta', v_delta,
+        'applied_subjects', to_jsonb(v_valid_subjects),
+        'ignored_subjects', to_jsonb(v_invalid_subjects)
+                 );
 end;
 $$;
 
@@ -2172,12 +2198,12 @@ CREATE FUNCTION public.sync_quest_connections_latest() RETURNS trigger
   )
   ON CONFLICT (connection_id) DO UPDATE SET
     connection_id = COALESCE(NEW.connection_id, quest_connections_latest.connection_id),
-    is_deleted = COALESCE(NEW.is_deleted, quest_connections_latest.is_deleted),
-    type = COALESCE(NEW.type, quest_connections_latest.type),
-    xp_requirement = COALESCE(NEW.xp_requirement, quest_connections_latest.xp_requirement),
-    last_updated_at = COALESCE(NEW.created_at, quest_connections_latest.last_updated_at),
-    last_updated_by = COALESCE(NEW.created_by, quest_connections_latest.last_updated_by);
-  RETURN NEW;
+                                                  is_deleted = COALESCE(NEW.is_deleted, quest_connections_latest.is_deleted),
+                                                  type = COALESCE(NEW.type, quest_connections_latest.type),
+                                                  xp_requirement = COALESCE(NEW.xp_requirement, quest_connections_latest.xp_requirement),
+                                                  last_updated_at = COALESCE(NEW.created_at, quest_connections_latest.last_updated_at),
+                                                  last_updated_by = COALESCE(NEW.created_by, quest_connections_latest.last_updated_by);
+RETURN NEW;
 END;$$;
 
 
@@ -2212,19 +2238,19 @@ CREATE FUNCTION public.sync_quests_latest() RETURNS trigger
   )
   ON CONFLICT (quest_id) DO UPDATE SET
     title       = COALESCE(NEW.title,       quests_latest.title),
-    description = COALESCE(NEW.description, quests_latest.description),
-    difficulty  = COALESCE(NEW.difficulty,  quests_latest.difficulty),
-    pos_x       = COALESCE(NEW.pos_x,       quests_latest.pos_x),
-    pos_y       = COALESCE(NEW.pos_y,       quests_latest.pos_y),
-    size_x      = COALESCE(NEW.size_x,      quests_latest.size_x),
-    size_y      = COALESCE(NEW.size_y,      quests_latest.size_y),
-    color       = COALESCE(NEW.color,       quests_latest.color),
-    is_deleted  = COALESCE(NEW.is_deleted,  quests_latest.is_deleted),
-    subject     = COALESCE(NEW.subject,     quests_latest.subject),
-    updated_at  = NEW.created_at,
-    version_id  = NEW.id;
+                                             description = COALESCE(NEW.description, quests_latest.description),
+                                             difficulty  = COALESCE(NEW.difficulty,  quests_latest.difficulty),
+                                             pos_x       = COALESCE(NEW.pos_x,       quests_latest.pos_x),
+                                             pos_y       = COALESCE(NEW.pos_y,       quests_latest.pos_y),
+                                             size_x      = COALESCE(NEW.size_x,      quests_latest.size_x),
+                                             size_y      = COALESCE(NEW.size_y,      quests_latest.size_y),
+                                             color       = COALESCE(NEW.color,       quests_latest.color),
+                                             is_deleted  = COALESCE(NEW.is_deleted,  quests_latest.is_deleted),
+                                             subject     = COALESCE(NEW.subject,     quests_latest.subject),
+                                             updated_at  = NEW.created_at,
+                                             version_id  = NEW.id;
 
-  RETURN NEW;
+RETURN NEW;
 END;$$;
 
 
@@ -2237,20 +2263,20 @@ CREATE FUNCTION public.toggle_dislike(p_video_id bigint) RETURNS text
     SET search_path TO 'public'
     AS $$declare
   already_disliked boolean;
-  p_user_id uuid;
+p_user_id uuid;
 begin
   p_user_id = auth.uid();
-  select exists(select 1 from public.dislikes where user_id = p_user_id and video_id = p_video_id) into already_disliked;
+select exists(select 1 from public.dislikes where user_id = p_user_id and video_id = p_video_id) into already_disliked;
 
-  if already_disliked then
-    delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
-    return 'undisliked';
-  else
-    delete from public.likes where user_id = p_user_id and video_id = p_video_id;
-    update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
-    insert into public.dislikes (user_id, video_id) values (p_user_id, p_video_id);
-    return 'disliked';
-  end if;
+if already_disliked then
+delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
+return 'undisliked';
+else
+delete from public.likes where user_id = p_user_id and video_id = p_video_id;
+update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
+insert into public.dislikes (user_id, video_id) values (p_user_id, p_video_id);
+return 'disliked';
+end if;
 end;$$;
 
 
@@ -2264,17 +2290,17 @@ CREATE FUNCTION public.toggle_dislike(p_user_id uuid, p_video_id bigint) RETURNS
     AS $$declare
   already_disliked boolean;
 begin
-  select exists(select 1 from public.dislikes where user_id = p_user_id and video_id = p_video_id) into already_disliked;
+select exists(select 1 from public.dislikes where user_id = p_user_id and video_id = p_video_id) into already_disliked;
 
-  if already_disliked then
-    delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
-    return 'undisliked';
-  else
-    delete from public.likes where user_id = p_user_id and video_id = p_video_id;
-    update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
-    insert into public.dislikes (user_id, video_id) values (p_user_id, p_video_id);
-    return 'disliked';
-  end if;
+if already_disliked then
+delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
+return 'undisliked';
+else
+delete from public.likes where user_id = p_user_id and video_id = p_video_id;
+update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
+insert into public.dislikes (user_id, video_id) values (p_user_id, p_video_id);
+return 'disliked';
+end if;
 end;$$;
 
 
@@ -2287,48 +2313,48 @@ CREATE FUNCTION public.toggle_follow(p_other_id uuid) RETURNS text
     SET search_path TO 'public'
     AS $$declare
   already_followed boolean;
-  p_user_id uuid;
+p_user_id uuid;
 begin
   p_user_id = auth.uid();
   if p_user_id = p_other_id then
     raise exception 'cannot follow yourself';
-  end if;
+end if;
 
   perform 1 from public.profiles where id = p_other_id;
   if not found then
     raise exception 'target profile not found';
-  end if;
+end if;
 
-  select exists(
+select exists(
     select 1 from public.follows
     where follower_id = p_user_id and following_id = p_other_id
-  ) into already_followed;
+) into already_followed;
 
-  if already_followed then
-    delete from public.follows
-      where follower_id = p_user_id and following_id = p_other_id;
-      
-    update public.profiles
-      set followers_count = greatest(followers_count - 1, 0)
-      where id = p_other_id;
+if already_followed then
+delete from public.follows
+where follower_id = p_user_id and following_id = p_other_id;
 
-    update public.profiles
-      set following_count = greatest(following_count - 1, 0)
-      where id = p_user_id;
-    return 'unfollowed';
-  else
+update public.profiles
+set followers_count = greatest(followers_count - 1, 0)
+where id = p_other_id;
+
+update public.profiles
+set following_count = greatest(following_count - 1, 0)
+where id = p_user_id;
+return 'unfollowed';
+else
     insert into public.follows(follower_id, following_id, created_at)
       values (p_user_id, p_other_id, now());
 
-    update public.profiles
-      set followers_count = followers_count + 1
-      where id = p_other_id;
+update public.profiles
+set followers_count = followers_count + 1
+where id = p_other_id;
 
-    update public.profiles
-      set following_count = following_count + 1
-      where id = p_user_id;
-    return 'followed';
-  end if;
+update public.profiles
+set following_count = following_count + 1
+where id = p_user_id;
+return 'followed';
+end if;
 end;$$;
 
 
@@ -2341,26 +2367,26 @@ CREATE FUNCTION public.toggle_like(p_video_id bigint) RETURNS text
     SET search_path TO 'public'
     AS $$declare
   already_liked boolean;
-  author_id uuid;
+author_id uuid;
   p_user_id uuid;
 begin
   p_user_id = auth.uid();
-  select exists(select 1 from public.likes where user_id = p_user_id and video_id = p_video_id) into already_liked;
+select exists(select 1 from public.likes where user_id = p_user_id and video_id = p_video_id) into already_liked;
 
-  select (select v.author_id from public.videos v where v.id = p_video_id) into author_id;
+select (select v.author_id from public.videos v where v.id = p_video_id) into author_id;
 
-  if already_liked then
-    delete from public.likes where user_id = p_user_id and video_id = p_video_id;
-    update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
-    update public.profiles set total_likes_count = greatest(total_likes_count - 1, 0) where id = author_id;
-    return 'unliked';
-  else
-    delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
-    insert into public.likes (user_id, video_id) values (p_user_id, p_video_id);
-    update public.videos set like_count = like_count + 1 where id = p_video_id;
-    update public.profiles set total_likes_count = total_likes_count + 1 where id = author_id;
-    return 'liked';
-  end if;
+if already_liked then
+delete from public.likes where user_id = p_user_id and video_id = p_video_id;
+update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
+update public.profiles set total_likes_count = greatest(total_likes_count - 1, 0) where id = author_id;
+return 'unliked';
+else
+delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
+insert into public.likes (user_id, video_id) values (p_user_id, p_video_id);
+update public.videos set like_count = like_count + 1 where id = p_video_id;
+update public.profiles set total_likes_count = total_likes_count + 1 where id = author_id;
+return 'liked';
+end if;
 end;$$;
 
 
@@ -2373,24 +2399,24 @@ CREATE FUNCTION public.toggle_like(p_user_id uuid, p_video_id bigint) RETURNS te
     SET search_path TO 'public'
     AS $$declare
   already_liked boolean;
-  author_id uuid;
+author_id uuid;
 begin
-  select exists(select 1 from public.likes where user_id = p_user_id and video_id = p_video_id) into already_liked;
+select exists(select 1 from public.likes where user_id = p_user_id and video_id = p_video_id) into already_liked;
 
-  select (select v.author_id from public.videos v where v.id = p_video_id) into author_id;
+select (select v.author_id from public.videos v where v.id = p_video_id) into author_id;
 
-  if already_liked then
-    delete from public.likes where user_id = p_user_id and video_id = p_video_id;
-    update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
-    update public.profiles set total_likes_count = greatest(total_likes_count - 1, 0) where id = author_id;
-    return 'unliked';
-  else
-    delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
-    insert into public.likes (user_id, video_id) values (p_user_id, p_video_id);
-    update public.videos set like_count = like_count + 1 where id = p_video_id;
-    update public.profiles set total_likes_count = total_likes_count + 1 where id = author_id;
-    return 'liked';
-  end if;
+if already_liked then
+delete from public.likes where user_id = p_user_id and video_id = p_video_id;
+update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
+update public.profiles set total_likes_count = greatest(total_likes_count - 1, 0) where id = author_id;
+return 'unliked';
+else
+delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
+insert into public.likes (user_id, video_id) values (p_user_id, p_video_id);
+update public.videos set like_count = like_count + 1 where id = p_video_id;
+update public.profiles set total_likes_count = total_likes_count + 1 where id = author_id;
+return 'liked';
+end if;
 end;$$;
 
 
@@ -2403,30 +2429,30 @@ CREATE FUNCTION public.toggle_like_comment(p_comment_id integer) RETURNS boolean
     SET search_path TO 'public'
     AS $$DECLARE
   v_user_id uuid := get_my_jwt_sub();
-  v_now timestamptz := now();
+v_now timestamptz := now();
   v_did_like boolean;
 BEGIN
   IF EXISTS (SELECT 1 FROM comment_likes cl WHERE cl.user_id = v_user_id AND cl.comment_id = p_comment_id) THEN
-    DELETE FROM comment_likes
-     WHERE user_id = v_user_id AND comment_id = p_comment_id;
+DELETE FROM comment_likes
+WHERE user_id = v_user_id AND comment_id = p_comment_id;
 
-    UPDATE comments
-      SET like_count = GREATEST(like_count - 1, 0)
-    WHERE id = p_comment_id;
+UPDATE comments
+SET like_count = GREATEST(like_count - 1, 0)
+WHERE id = p_comment_id;
 
-    v_did_like := false;
-  ELSE
+v_did_like := false;
+ELSE
     INSERT INTO comment_likes(user_id, comment_id, created_at)
     VALUES (v_user_id, p_comment_id, v_now);
 
-    UPDATE comments
-      SET like_count = like_count + 1
-    WHERE id = p_comment_id;
+UPDATE comments
+SET like_count = like_count + 1
+WHERE id = p_comment_id;
 
-    v_did_like := true;
-  END IF;
+v_did_like := true;
+END IF;
 
-  RETURN v_did_like;
+RETURN v_did_like;
 END;$$;
 
 
@@ -2439,24 +2465,24 @@ CREATE FUNCTION public.toggle_like_old(p_user_id text, p_video_id bigint) RETURN
     SET search_path TO 'public'
     AS $$declare
   already_liked boolean;
-  author_id text;
+author_id text;
 begin
-  select exists(select 1 from public.likes where user_id = p_user_id and video_id = p_video_id) into already_liked;
+select exists(select 1 from public.likes where user_id = p_user_id and video_id = p_video_id) into already_liked;
 
-  select (select v.author_id from public.videos v where v.id = p_video_id) into author_id;
+select (select v.author_id from public.videos v where v.id = p_video_id) into author_id;
 
-  if already_liked then
-    delete from public.likes where user_id = p_user_id and video_id = p_video_id;
-    update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
-    update public.profiles set total_likes_count = greatest(total_likes_count - 1, 0) where id = author_id;
-    return 'unliked';
-  else
-    delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
-    insert into public.likes (user_id, video_id) values (p_user_id, p_video_id);
-    update public.videos set like_count = like_count + 1 where id = p_video_id;
-    update public.profiles set total_likes_count = total_likes_count + 1 where id = author_id;
-    return 'liked';
-  end if;
+if already_liked then
+delete from public.likes where user_id = p_user_id and video_id = p_video_id;
+update public.videos set like_count = greatest(like_count - 1, 0) where id = p_video_id;
+update public.profiles set total_likes_count = greatest(total_likes_count - 1, 0) where id = author_id;
+return 'unliked';
+else
+delete from public.dislikes where user_id = p_user_id and video_id = p_video_id;
+insert into public.likes (user_id, video_id) values (p_user_id, p_video_id);
+update public.videos set like_count = like_count + 1 where id = p_video_id;
+update public.profiles set total_likes_count = total_likes_count + 1 where id = author_id;
+return 'liked';
+end if;
 end;$$;
 
 
@@ -2469,22 +2495,22 @@ CREATE FUNCTION public.toggle_theme_like(p_theme_id uuid) RETURNS boolean
     SET search_path TO 'public'
     AS $$declare
   v_already_liked boolean;
-  v_user_id uuid;
+v_user_id uuid;
 
 begin
   v_user_id = auth.uid();
-  select exists(select 1 from public.theme_likes where user_id = v_user_id and theme_id = p_theme_id) into v_already_liked;
+select exists(select 1 from public.theme_likes where user_id = v_user_id and theme_id = p_theme_id) into v_already_liked;
 
 
-  if v_already_liked then
-    delete from public.theme_likes where user_id = v_user_id and theme_id = p_theme_id;
-    update public.themes set likes_count = greatest(likes_count - 1, 0) where id = p_theme_id;
-    return false;
-  else
+if v_already_liked then
+delete from public.theme_likes where user_id = v_user_id and theme_id = p_theme_id;
+update public.themes set likes_count = greatest(likes_count - 1, 0) where id = p_theme_id;
+return false;
+else
     insert into public.theme_likes (user_id, theme_id) values (v_user_id, p_theme_id);
-    update public.themes set likes_count = likes_count + 1 where id = p_theme_id;
-    return true;
-  end if;
+update public.themes set likes_count = likes_count + 1 where id = p_theme_id;
+return true;
+end if;
 end;$$;
 
 
@@ -2520,67 +2546,67 @@ begin
     on conflict do nothing;
 
     perform public.refresh_conversation_last_message(new.conversation_id);
-    return new;
-  end if;
+return new;
+end if;
 
   if tg_op = 'UPDATE' then
     if new.content is distinct from old.content then
-      select coalesce(max(version_no), 0) + 1
-      into v_next_version
-      from public.message_versions
-      where message_id = new.id;
+select coalesce(max(version_no), 0) + 1
+into v_next_version
+from public.message_versions
+where message_id = new.id;
 
-      insert into public.message_versions (
-        message_id,
-        conversation_id,
-        version_no,
-        content,
-        edited_at,
-        edited_by,
-        change_type
-      )
-      values (
-        new.id,
-        new.conversation_id,
-        v_next_version,
-        coalesce(new.content, ''),
-        coalesce(new.edited_at, now()),
-        auth.uid(),
-        'edit'
-      );
-    end if;
+insert into public.message_versions (
+    message_id,
+    conversation_id,
+    version_no,
+    content,
+    edited_at,
+    edited_by,
+    change_type
+)
+values (
+           new.id,
+           new.conversation_id,
+           v_next_version,
+           coalesce(new.content, ''),
+           coalesce(new.edited_at, now()),
+           auth.uid(),
+           'edit'
+       );
+end if;
 
     if new.deleted_at is distinct from old.deleted_at and new.deleted_at is not null then
-      select coalesce(max(version_no), 0) + 1
-      into v_next_version
-      from public.message_versions
-      where message_id = new.id;
+select coalesce(max(version_no), 0) + 1
+into v_next_version
+from public.message_versions
+where message_id = new.id;
 
-      insert into public.message_versions (
-        message_id,
-        conversation_id,
-        version_no,
-        content,
-        edited_at,
-        edited_by,
-        change_type
-      )
-      values (
-        new.id,
-        new.conversation_id,
-        v_next_version,
-        coalesce(new.content, ''),
-        new.deleted_at,
-        auth.uid(),
-        'delete'
-      );
-    end if;
+insert into public.message_versions (
+    message_id,
+    conversation_id,
+    version_no,
+    content,
+    edited_at,
+    edited_by,
+    change_type
+)
+values (
+           new.id,
+           new.conversation_id,
+           v_next_version,
+           coalesce(new.content, ''),
+           new.deleted_at,
+           auth.uid(),
+           'delete'
+       );
+end if;
 
     perform public.refresh_conversation_last_message(new.conversation_id);
-    return new;
-  end if;
+return new;
+end if;
 
-  return new;
+return new;
 end;$$;
 
 
@@ -2593,11 +2619,11 @@ CREATE FUNCTION public.trg_inc_profile_video_count() RETURNS trigger
     SET search_path TO 'public'
     AS $$
 BEGIN
-  UPDATE profiles
-  SET total_videos_count = total_videos_count + 1
-  WHERE id = NEW.author_id;
+UPDATE profiles
+SET total_videos_count = total_videos_count + 1
+WHERE id = NEW.author_id;
 
-  RETURN NEW;
+RETURN NEW;
 END;
 $$;
 
@@ -2609,14 +2635,14 @@ $$;
 CREATE FUNCTION public.unseen_video_tags(p_user_id uuid) RETURNS SETOF public.video_tags
     LANGUAGE sql STABLE
     AS $$
-  SELECT vt.*
-  FROM video_tags vt
-  WHERE NOT EXISTS (
+SELECT vt.*
+FROM video_tags vt
+WHERE NOT EXISTS (
     SELECT 1
     FROM user_interactions ui
     WHERE ui.video_id = vt.video_id
       AND ui.user_id = p_user_id
-  );
+);
 $$;
 
 
@@ -2625,8 +2651,8 @@ $$;
 --
 
 CREATE TABLE public.ai_bots (
-    user_id uuid NOT NULL,
-    system_prompt text DEFAULT 'You are a helpful assistant for educational purposes'::text NOT NULL
+                                user_id uuid NOT NULL,
+                                system_prompt text DEFAULT 'NULL'::text
 );
 
 
@@ -2635,8 +2661,8 @@ CREATE TABLE public.ai_bots (
 --
 
 CREATE TABLE public.applied_themes (
-    user_id uuid DEFAULT auth.uid() NOT NULL,
-    theme_id uuid DEFAULT gen_random_uuid() NOT NULL
+                                       user_id uuid DEFAULT auth.uid() NOT NULL,
+                                       theme_id uuid DEFAULT gen_random_uuid() NOT NULL
 );
 
 
@@ -2652,13 +2678,13 @@ COMMENT ON TABLE public.applied_themes IS 'the theme every user currently has ap
 --
 
 CREATE TABLE public.ban_appeals (
-    id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    user_id uuid NOT NULL,
-    appeal_message text NOT NULL,
-    approved boolean,
-    answer text,
-    reviewer_id uuid
+                                    id bigint NOT NULL,
+                                    created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                    user_id uuid NOT NULL,
+                                    appeal_message text NOT NULL,
+                                    approved boolean,
+                                    answer text,
+                                    reviewer_id uuid
 );
 
 
@@ -2681,10 +2707,10 @@ ALTER TABLE public.ban_appeals ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENT
 --
 
 CREATE TABLE public.banned_words (
-    word text NOT NULL,
-    id bigint NOT NULL,
-    severity smallint DEFAULT '1'::smallint NOT NULL,
-    CONSTRAINT banned_words_severity_check CHECK ((severity > 0))
+                                     word text NOT NULL,
+                                     id bigint NOT NULL,
+                                     severity smallint DEFAULT '1'::smallint NOT NULL,
+                                     CONSTRAINT banned_words_severity_check CHECK ((severity > 0))
 );
 
 
@@ -2707,9 +2733,9 @@ ALTER TABLE public.banned_words ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDEN
 --
 
 CREATE TABLE public.categories (
-    id text NOT NULL,
-    name text NOT NULL,
-    description text
+                                   id text NOT NULL,
+                                   name text NOT NULL,
+                                   description text
 );
 
 
@@ -2725,9 +2751,9 @@ COMMENT ON TABLE public.categories IS 'categories you can level up in';
 --
 
 CREATE TABLE public.comment_likes (
-    user_id uuid NOT NULL,
-    comment_id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
+                                      user_id uuid NOT NULL,
+                                      comment_id bigint NOT NULL,
+                                      created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -2743,14 +2769,14 @@ COMMENT ON TABLE public.comment_likes IS 'likes of comments';
 --
 
 CREATE TABLE public.comments (
-    id bigint NOT NULL,
-    author_id uuid NOT NULL,
-    video_id bigint NOT NULL,
-    content character varying(300) NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    parent_id bigint,
-    reply_count integer DEFAULT 0 NOT NULL,
-    like_count integer DEFAULT 0 NOT NULL
+                                 id bigint NOT NULL,
+                                 author_id uuid NOT NULL,
+                                 video_id bigint NOT NULL,
+                                 content character varying(300) NOT NULL,
+                                 created_at timestamp with time zone DEFAULT now(),
+                                 parent_id bigint,
+                                 reply_count integer DEFAULT 0 NOT NULL,
+                                 like_count integer DEFAULT 0 NOT NULL
 );
 
 
@@ -2780,11 +2806,11 @@ ALTER TABLE public.comments ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 --
 
 CREATE TABLE public.conversation_members (
-    conversation_id bigint NOT NULL,
-    profile_id uuid NOT NULL,
-    role text DEFAULT 'member'::text NOT NULL,
-    joined_at timestamp with time zone DEFAULT now() NOT NULL,
-    last_read_message_id bigint
+                                             conversation_id bigint NOT NULL,
+                                             profile_id uuid NOT NULL,
+                                             role text DEFAULT 'member'::text NOT NULL,
+                                             joined_at timestamp with time zone DEFAULT now() NOT NULL,
+                                             last_read_message_id bigint
 );
 
 
@@ -2793,14 +2819,14 @@ CREATE TABLE public.conversation_members (
 --
 
 CREATE TABLE public.conversations (
-    id bigint NOT NULL,
-    type text NOT NULL,
-    created_by uuid NOT NULL,
-    title text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    last_message text DEFAULT ''::text NOT NULL,
-    CONSTRAINT conversations_type_check CHECK ((type = ANY (ARRAY['direct'::text, 'group'::text, 'direct-ai'::text])))
+                                      id bigint NOT NULL,
+                                      type text NOT NULL,
+                                      created_by uuid NOT NULL,
+                                      title text,
+                                      created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+                                      last_message text DEFAULT ''::text NOT NULL,
+                                      CONSTRAINT conversations_type_check CHECK ((type = ANY (ARRAY['direct'::text, 'group'::text, 'direct-ai'::text])))
 );
 
 
@@ -2835,9 +2861,9 @@ ALTER SEQUENCE public.conversations_id_seq OWNED BY public.conversations.id;
 --
 
 CREATE TABLE public.dislikes (
-    user_id uuid NOT NULL,
-    video_id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
+                                 user_id uuid NOT NULL,
+                                 video_id bigint NOT NULL,
+                                 created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -2853,9 +2879,9 @@ COMMENT ON TABLE public.dislikes IS 'all dislikes of all users';
 --
 
 CREATE TABLE public.follows (
-    follower_id uuid NOT NULL,
-    following_id uuid NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
+                                follower_id uuid NOT NULL,
+                                following_id uuid NOT NULL,
+                                created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -2864,9 +2890,9 @@ CREATE TABLE public.follows (
 --
 
 CREATE TABLE public.likes (
-    user_id uuid NOT NULL,
-    video_id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
+                              user_id uuid NOT NULL,
+                              video_id bigint NOT NULL,
+                              created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -2903,8 +2929,8 @@ ALTER TABLE public.messages ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 --
 
 CREATE TABLE public.pro_users (
-    user_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+                                  user_id uuid DEFAULT gen_random_uuid() NOT NULL,
+                                  created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -2913,9 +2939,9 @@ CREATE TABLE public.pro_users (
 --
 
 CREATE TABLE public.profile_levels (
-    user_id uuid DEFAULT auth.uid() NOT NULL,
-    category text DEFAULT ''::text NOT NULL,
-    level real DEFAULT '0'::real NOT NULL
+                                       user_id uuid DEFAULT auth.uid() NOT NULL,
+                                       category text DEFAULT ''::text NOT NULL,
+                                       level real DEFAULT '0'::real NOT NULL
 );
 
 
@@ -2938,9 +2964,9 @@ COMMENT ON COLUMN public.profile_levels.level IS 'the level the user is in that 
 --
 
 CREATE TABLE public.profile_quest_progress (
-    user_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    quest_id bigint NOT NULL,
-    progress real DEFAULT '0'::real NOT NULL
+                                               user_id uuid DEFAULT gen_random_uuid() NOT NULL,
+                                               quest_id bigint NOT NULL,
+                                               progress real DEFAULT '0'::real NOT NULL
 );
 
 
@@ -2949,9 +2975,9 @@ CREATE TABLE public.profile_quest_progress (
 --
 
 CREATE TABLE public.profile_settings (
-    user_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    setting_key text NOT NULL,
-    setting_value text NOT NULL
+                                         user_id uuid DEFAULT gen_random_uuid() NOT NULL,
+                                         setting_key text NOT NULL,
+                                         setting_value text NOT NULL
 );
 
 
@@ -2960,14 +2986,14 @@ CREATE TABLE public.profile_settings (
 --
 
 CREATE TABLE public.quest_connection_versions (
-    id bigint NOT NULL,
-    connection_id bigint NOT NULL,
-    type text DEFAULT 'prerequisite'::text,
-    is_deleted boolean DEFAULT false NOT NULL,
-    update_message text DEFAULT ''::text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by uuid NOT NULL,
-    xp_requirement real
+                                                  id bigint NOT NULL,
+                                                  connection_id bigint NOT NULL,
+                                                  type text DEFAULT 'prerequisite'::text,
+                                                  is_deleted boolean DEFAULT false NOT NULL,
+                                                  update_message text DEFAULT ''::text NOT NULL,
+                                                  created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                                  created_by uuid NOT NULL,
+                                                  xp_requirement real
 );
 
 
@@ -2990,11 +3016,11 @@ ALTER TABLE public.quest_connection_versions ALTER COLUMN id ADD GENERATED BY DE
 --
 
 CREATE TABLE public.quest_connections (
-    from_id bigint NOT NULL,
-    to_id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by uuid NOT NULL,
-    connection_id bigint NOT NULL
+                                          from_id bigint NOT NULL,
+                                          to_id bigint NOT NULL,
+                                          created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                          created_by uuid NOT NULL,
+                                          connection_id bigint NOT NULL
 );
 
 
@@ -3017,12 +3043,12 @@ ALTER TABLE public.quest_connections ALTER COLUMN connection_id ADD GENERATED BY
 --
 
 CREATE TABLE public.quest_connections_latest (
-    last_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    last_updated_by uuid NOT NULL,
-    connection_id bigint NOT NULL,
-    is_deleted boolean DEFAULT false NOT NULL,
-    type text DEFAULT ''::text NOT NULL,
-    xp_requirement real DEFAULT '0'::real NOT NULL
+                                                 last_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+                                                 last_updated_by uuid NOT NULL,
+                                                 connection_id bigint NOT NULL,
+                                                 is_deleted boolean DEFAULT false NOT NULL,
+                                                 type text DEFAULT ''::text NOT NULL,
+                                                 xp_requirement real DEFAULT '0'::real NOT NULL
 );
 
 
@@ -3052,10 +3078,10 @@ ALTER TABLE public.quest_connections_latest ALTER COLUMN connection_id ADD GENER
 --
 
 CREATE TABLE public.quest_title_aliases (
-    quest_id bigint NOT NULL,
-    alias text NOT NULL,
-    created_by uuid,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+                                            quest_id bigint NOT NULL,
+                                            alias text NOT NULL,
+                                            created_by uuid,
+                                            created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -3078,21 +3104,21 @@ ALTER TABLE public.quest_title_aliases ALTER COLUMN quest_id ADD GENERATED BY DE
 --
 
 CREATE TABLE public.quest_versions (
-    id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by uuid,
-    quest_id bigint NOT NULL,
-    update_message text DEFAULT ''::text NOT NULL,
-    title text,
-    description text,
-    difficulty real,
-    pos_x bigint,
-    pos_y bigint,
-    size_x smallint,
-    size_y smallint,
-    is_deleted boolean,
-    subject text,
-    color bigint
+                                       id bigint NOT NULL,
+                                       created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                       created_by uuid,
+                                       quest_id bigint NOT NULL,
+                                       update_message text DEFAULT ''::text NOT NULL,
+                                       title text,
+                                       description text,
+                                       difficulty real,
+                                       pos_x bigint,
+                                       pos_y bigint,
+                                       size_x smallint,
+                                       size_y smallint,
+                                       is_deleted boolean,
+                                       subject text,
+                                       color bigint
 );
 
 
@@ -3115,9 +3141,9 @@ ALTER TABLE public.quest_versions ALTER COLUMN id ADD GENERATED BY DEFAULT AS ID
 --
 
 CREATE TABLE public.quests (
-    id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by uuid NOT NULL
+                               id bigint NOT NULL,
+                               created_at timestamp with time zone DEFAULT now() NOT NULL,
+                               created_by uuid NOT NULL
 );
 
 
@@ -3133,19 +3159,19 @@ COMMENT ON TABLE public.quests IS 'all quests ever written, the outdated ones as
 --
 
 CREATE TABLE public.quests_latest (
-    quest_id bigint NOT NULL,
-    title text DEFAULT ''::text NOT NULL,
-    description text DEFAULT ''::text NOT NULL,
-    difficulty real DEFAULT 0.2 NOT NULL,
-    pos_x bigint DEFAULT 0 NOT NULL,
-    pos_y bigint DEFAULT 0 NOT NULL,
-    size_x smallint DEFAULT 200 NOT NULL,
-    size_y smallint DEFAULT 100 NOT NULL,
-    is_deleted boolean DEFAULT false NOT NULL,
-    subject text DEFAULT ''::text NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    version_id bigint,
-    color bigint DEFAULT '4294967295'::bigint NOT NULL
+                                      quest_id bigint NOT NULL,
+                                      title text DEFAULT ''::text NOT NULL,
+                                      description text DEFAULT ''::text NOT NULL,
+                                      difficulty real DEFAULT 0.2 NOT NULL,
+                                      pos_x bigint DEFAULT 0 NOT NULL,
+                                      pos_y bigint DEFAULT 0 NOT NULL,
+                                      size_x smallint DEFAULT 200 NOT NULL,
+                                      size_y smallint DEFAULT 100 NOT NULL,
+                                      is_deleted boolean DEFAULT false NOT NULL,
+                                      subject text DEFAULT ''::text NOT NULL,
+                                      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+                                      version_id bigint,
+                                      color bigint DEFAULT '4294967295'::bigint NOT NULL
 );
 
 
@@ -3154,8 +3180,8 @@ CREATE TABLE public.quests_latest (
 --
 
 CREATE TABLE public.saved_themes (
-    user_id uuid DEFAULT auth.uid() NOT NULL,
-    theme_id uuid NOT NULL
+                                     user_id uuid DEFAULT auth.uid() NOT NULL,
+                                     theme_id uuid NOT NULL
 );
 
 
@@ -3164,9 +3190,9 @@ CREATE TABLE public.saved_themes (
 --
 
 CREATE TABLE public.saved_videos (
-    user_id uuid NOT NULL,
-    video_id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+                                     user_id uuid NOT NULL,
+                                     video_id bigint NOT NULL,
+                                     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -3175,8 +3201,8 @@ CREATE TABLE public.saved_videos (
 --
 
 CREATE TABLE public.tags (
-    id integer NOT NULL,
-    name character varying(30) NOT NULL
+                             id integer NOT NULL,
+                             name character varying(30) NOT NULL
 );
 
 
@@ -3199,17 +3225,17 @@ ALTER TABLE public.tags ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 --
 
 CREATE TABLE public.task_attempts (
-    id bigint NOT NULL,
-    task_id bigint NOT NULL,
-    version_id bigint NOT NULL,
-    user_id uuid DEFAULT auth.uid() NOT NULL,
-    answer_data jsonb DEFAULT '{}'::jsonb NOT NULL,
-    evaluation jsonb DEFAULT '{}'::jsonb NOT NULL,
-    is_correct boolean DEFAULT false NOT NULL,
-    xp_delta double precision DEFAULT 0 NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT task_attempts_answer_data_check CHECK ((jsonb_typeof(answer_data) = 'object'::text)),
-    CONSTRAINT task_attempts_evaluation_check CHECK ((jsonb_typeof(evaluation) = 'object'::text))
+                                      id bigint NOT NULL,
+                                      task_id bigint NOT NULL,
+                                      version_id bigint NOT NULL,
+                                      user_id uuid DEFAULT auth.uid() NOT NULL,
+                                      answer_data jsonb DEFAULT '{}'::jsonb NOT NULL,
+                                      evaluation jsonb DEFAULT '{}'::jsonb NOT NULL,
+                                      is_correct boolean DEFAULT false NOT NULL,
+                                      xp_delta double precision DEFAULT 0 NOT NULL,
+                                      created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                      CONSTRAINT task_attempts_answer_data_check CHECK ((jsonb_typeof(answer_data) = 'object'::text)),
+                                      CONSTRAINT task_attempts_evaluation_check CHECK ((jsonb_typeof(evaluation) = 'object'::text))
 );
 
 
@@ -3232,11 +3258,11 @@ ALTER TABLE public.task_attempts ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDE
 --
 
 CREATE TABLE public.task_solutions (
-    solution_id bigint NOT NULL,
-    task_id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by uuid DEFAULT gen_random_uuid() NOT NULL,
-    data jsonb NOT NULL
+                                       solution_id bigint NOT NULL,
+                                       task_id bigint NOT NULL,
+                                       created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                       created_by uuid DEFAULT gen_random_uuid() NOT NULL,
+                                       data jsonb NOT NULL
 );
 
 
@@ -3259,10 +3285,10 @@ ALTER TABLE public.task_solutions ALTER COLUMN solution_id ADD GENERATED BY DEFA
 --
 
 CREATE TABLE public.task_solves (
-    user_id uuid DEFAULT auth.uid() NOT NULL,
-    task_id bigint NOT NULL,
-    solved_at timestamp with time zone NOT NULL,
-    id bigint NOT NULL
+                                    user_id uuid DEFAULT auth.uid() NOT NULL,
+                                    task_id bigint NOT NULL,
+                                    solved_at timestamp with time zone NOT NULL,
+                                    id bigint NOT NULL
 );
 
 
@@ -3299,18 +3325,18 @@ ALTER TABLE public.task_versions ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDE
 --
 
 CREATE TABLE public.tasks (
-    id bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by uuid DEFAULT auth.uid(),
-    title text DEFAULT 'No Title Provided'::text,
-    type text NOT NULL,
-    data jsonb NOT NULL,
-    subjects text[] DEFAULT '{General}'::text[] NOT NULL,
-    xp_reward double precision DEFAULT '0.1'::double precision NOT NULL,
-    xp_punishment double precision DEFAULT '0'::double precision NOT NULL,
-    visibility text DEFAULT 'public'::text NOT NULL,
-    current_version_id bigint,
-    CONSTRAINT tasks_visibility_check CHECK ((visibility = ANY (ARRAY['private'::text, 'unlisted'::text, 'public'::text])))
+                              id bigint NOT NULL,
+                              created_at timestamp with time zone DEFAULT now() NOT NULL,
+                              created_by uuid DEFAULT auth.uid(),
+                              title text DEFAULT 'No Title Provided'::text,
+                              type text NOT NULL,
+                              data jsonb NOT NULL,
+                              subjects text[] DEFAULT '{General}'::text[] NOT NULL,
+                              xp_reward double precision DEFAULT '0.1'::double precision NOT NULL,
+                              xp_punishment double precision DEFAULT '0'::double precision NOT NULL,
+                              visibility text DEFAULT 'public'::text NOT NULL,
+                              current_version_id bigint,
+                              CONSTRAINT tasks_visibility_check CHECK ((visibility = ANY (ARRAY['private'::text, 'unlisted'::text, 'public'::text])))
 );
 
 
@@ -3340,11 +3366,11 @@ ALTER TABLE public.tasks ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
 --
 
 CREATE TABLE public.theme_comments (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
-    theme_id uuid,
-    user_id uuid,
-    comment_text text NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
+                                       id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+                                       theme_id uuid,
+                                       user_id uuid,
+                                       comment_text text NOT NULL,
+                                       created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -3353,10 +3379,10 @@ CREATE TABLE public.theme_comments (
 --
 
 CREATE TABLE public.theme_likes (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
-    theme_id uuid,
-    user_id uuid,
-    created_at timestamp with time zone DEFAULT now()
+                                    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+                                    theme_id uuid,
+                                    user_id uuid,
+                                    created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -3365,15 +3391,15 @@ CREATE TABLE public.theme_likes (
 --
 
 CREATE TABLE public.themes (
-    id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    created_by uuid,
-    name text NOT NULL,
-    primary_color bigint NOT NULL,
-    is_public boolean DEFAULT false,
-    likes_count integer DEFAULT 0,
-    theme_data text,
-    original_theme_id uuid
+                               id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+                               created_at timestamp with time zone DEFAULT now(),
+                               created_by uuid,
+                               name text NOT NULL,
+                               primary_color bigint NOT NULL,
+                               is_public boolean DEFAULT false,
+                               likes_count integer DEFAULT 0,
+                               theme_data text,
+                               original_theme_id uuid
 );
 
 
@@ -3389,14 +3415,14 @@ COMMENT ON COLUMN public.themes.original_theme_id IS 'if this theme is a copy of
 --
 
 CREATE TABLE public.user_interactions (
-    user_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    video_id bigint,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    interaction_type text DEFAULT ''::text NOT NULL,
-    additional_data jsonb,
-    interaction_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    liked boolean DEFAULT false NOT NULL,
-    watch_time double precision DEFAULT '0'::double precision
+                                          user_id uuid DEFAULT gen_random_uuid() NOT NULL,
+                                          video_id bigint,
+                                          created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                          interaction_type text DEFAULT ''::text NOT NULL,
+                                          additional_data jsonb,
+                                          interaction_id uuid DEFAULT gen_random_uuid() NOT NULL,
+                                          liked boolean DEFAULT false NOT NULL,
+                                          watch_time double precision DEFAULT '0'::double precision
 );
 
 
@@ -3412,10 +3438,10 @@ COMMENT ON COLUMN public.user_interactions.additional_data IS 'any additional da
 --
 
 CREATE TABLE public.user_streaks (
-    user_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    streak integer DEFAULT 0 NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    best_streak integer
+                                     user_id uuid DEFAULT gen_random_uuid() NOT NULL,
+                                     streak integer DEFAULT 0 NOT NULL,
+                                     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+                                     best_streak integer
 );
 
 
@@ -3424,11 +3450,11 @@ CREATE TABLE public.user_streaks (
 --
 
 CREATE TABLE public.user_warnings (
-    id bigint NOT NULL,
-    user_id uuid NOT NULL,
-    reason text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    forgiven boolean DEFAULT false NOT NULL
+                                      id bigint NOT NULL,
+                                      user_id uuid NOT NULL,
+                                      reason text NOT NULL,
+                                      created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                      forgiven boolean DEFAULT false NOT NULL
 );
 
 
@@ -3451,12 +3477,12 @@ ALTER TABLE public.user_warnings ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTIT
 --
 
 CREATE TABLE public.video_reports (
-    id bigint NOT NULL,
-    user_id uuid NOT NULL,
-    video_id bigint NOT NULL,
-    reason text NOT NULL,
-    status text DEFAULT 'pending'::text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+                                      id bigint NOT NULL,
+                                      user_id uuid NOT NULL,
+                                      video_id bigint NOT NULL,
+                                      reason text NOT NULL,
+                                      status text DEFAULT 'pending'::text NOT NULL,
+                                      created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -4265,7 +4291,7 @@ ALTER TABLE ONLY public.message_versions
 --
 
 ALTER TABLE ONLY public.messages
-    ADD CONSTRAINT messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id) ON DELETE CASCADE;
+    ADD CONSTRAINT messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -4701,9 +4727,13 @@ CREATE POLICY "Auth insert" ON public.likes FOR INSERT WITH CHECK ((( SELECT aut
 -- Name: messages Auth insert; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Auth insert" ON public.messages FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+CREATE POLICY "Auth insert" ON public.messages FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
    FROM public.conversation_members cm
-  WHERE ((cm.profile_id = ( SELECT auth.uid() AS uid)) AND (cm.conversation_id = cm.conversation_id)))));
+  WHERE ((cm.profile_id = ( SELECT auth.uid() AS uid)) AND (cm.conversation_id = cm.conversation_id)))) OR (EXISTS ( SELECT 1
+   FROM public.ai_bots
+  WHERE (ai_bots.user_id = ( SELECT cm.profile_id
+           FROM public.conversation_members cm
+          WHERE ((cm.conversation_id = cm.conversation_id) AND (cm.profile_id = ( SELECT auth.uid() AS uid)))))))));
 
 
 --
@@ -4732,10 +4762,10 @@ CREATE POLICY "Auth insert" ON public.video_reports FOR INSERT WITH CHECK ((( SE
 --
 
 CREATE POLICY "Auth update" ON public.messages FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM public.conversation_members cm
-  WHERE ((cm.profile_id = ( SELECT auth.uid() AS uid)) AND (cm.conversation_id = cm.conversation_id))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM public.conversation_members cm
-  WHERE ((cm.profile_id = ( SELECT auth.uid() AS uid)) AND (cm.conversation_id = cm.conversation_id)))));
+                                                                                                        FROM public.conversation_members cm
+                                                                                                        WHERE ((cm.profile_id = ( SELECT auth.uid() AS uid)) AND (cm.conversation_id = cm.conversation_id))))) WITH CHECK ((EXISTS ( SELECT 1
+                                                                                                        FROM public.conversation_members cm
+                                                                                                        WHERE ((cm.profile_id = ( SELECT auth.uid() AS uid)) AND (cm.conversation_id = cm.conversation_id)))));
 
 
 --
@@ -4979,8 +5009,8 @@ CREATE POLICY "auth insert" ON public.quests FOR INSERT TO authenticated WITH CH
 --
 
 CREATE POLICY "auth read" ON public.conversations FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM public.conversation_members
-  WHERE ((conversation_members.conversation_id = conversations.id) AND (conversation_members.profile_id = ( SELECT auth.uid() AS uid))))));
+                                                                                                                                                                                                                                                                                                                                  FROM public.conversation_members
+                                                                                                                                                                                                                                                                                                                                  WHERE ((conversation_members.conversation_id = conversations.id) AND (conversation_members.profile_id = ( SELECT auth.uid() AS uid))))));
 
 
 --
@@ -4988,8 +5018,8 @@ CREATE POLICY "auth read" ON public.conversations FOR SELECT USING ((EXISTS ( SE
 --
 
 CREATE POLICY "auth read" ON public.messages FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
-   FROM public.conversation_members cm
-  WHERE ((cm.profile_id = ( SELECT auth.uid() AS uid)) AND (cm.conversation_id = cm.conversation_id)))));
+                                                     FROM public.conversation_members cm
+                                                     WHERE ((cm.profile_id = ( SELECT auth.uid() AS uid)) AND (cm.conversation_id = cm.conversation_id)))));
 
 
 --
@@ -5241,8 +5271,8 @@ CREATE POLICY "owner delete own" ON public.task_solutions FOR DELETE USING (((EX
 --
 
 CREATE POLICY "owner read" ON public.task_solutions FOR SELECT USING (((EXISTS ( SELECT t.created_by
-   FROM public.tasks t
-  WHERE ((t.id = task_solutions.task_id) AND (t.created_by = t.created_by)))) AND (created_by = ( SELECT auth.uid() AS uid))));
+                                                                                                                                        FROM public.tasks t
+                                                                                                                                        WHERE ((t.id = task_solutions.task_id) AND (t.created_by = t.created_by)))) AND (created_by = ( SELECT auth.uid() AS uid))));
 
 
 --
@@ -5250,10 +5280,10 @@ CREATE POLICY "owner read" ON public.task_solutions FOR SELECT USING (((EXISTS (
 --
 
 CREATE POLICY "owner update" ON public.task_solutions FOR UPDATE USING (((EXISTS ( SELECT t.created_by
-   FROM public.tasks t
-  WHERE ((t.id = task_solutions.task_id) AND (t.created_by = t.created_by)))) AND (created_by = ( SELECT auth.uid() AS uid)))) WITH CHECK (((EXISTS ( SELECT t.created_by
-   FROM public.tasks t
-  WHERE ((t.id = task_solutions.task_id) AND (t.created_by = t.created_by)))) AND (created_by = ( SELECT auth.uid() AS uid))));
+                                                              FROM public.tasks t
+                                                              WHERE ((t.id = task_solutions.task_id) AND (t.created_by = t.created_by)))) AND (created_by = ( SELECT auth.uid() AS uid)))) WITH CHECK (((EXISTS ( SELECT t.created_by
+                                                              FROM public.tasks t
+                                                              WHERE ((t.id = task_solutions.task_id) AND (t.created_by = t.created_by)))) AND (created_by = ( SELECT auth.uid() AS uid))));
 
 
 --
@@ -5391,8 +5421,8 @@ CREATE POLICY "public read" ON public.theme_likes FOR SELECT USING (true);
 --
 
 CREATE POLICY "public read if referenced theme is public" ON public.theme_comments FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM public.themes t
-  WHERE ((t.id = theme_comments.theme_id) AND (t.is_public OR (( SELECT auth.uid() AS uid) = t.created_by))))));
+                                                                                           FROM public.themes t
+                                                                                           WHERE ((t.id = theme_comments.theme_id) AND (t.is_public OR (( SELECT auth.uid() AS uid) = t.created_by))))));
 
 
 --
@@ -5711,5 +5741,5 @@ ALTER TABLE public.videos ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pYYZY8AGZPdChPLsIIMsKIbe35dYKUO7tzkZGL62RSZCMOW0jZWgku1KnDuSmc5
+\unrestrict tqbzh9vNChrVtfvIp2F0Wqlg0iGyci1lW7CNwMHkED5IxRykhu0L4x75cbAKft8
 
